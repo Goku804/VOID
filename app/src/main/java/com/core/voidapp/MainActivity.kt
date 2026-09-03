@@ -68,7 +68,7 @@ private val TextSecondary = Color(0xFF7A8B84)
 private val Accent = Color(0xFF00E676)
 
 private const val APP_NAME = "VOID"
-private const val APP_VERSION = "VOID v0.3.0"
+private const val APP_VERSION = "VOID v0.4.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -576,11 +576,7 @@ fun PlanningScreen() {
 
 @Composable
 fun AcademicScreen() {
-    PlaceholderScreen(
-        title = "ACADEMIC",
-        subtitle = "GRADES \u2022 SUBJECTS \u2022 UNITS",
-        message = "Academic database initializing..."
-    )
+    AcademicScreenReal()
 }
 
 @Composable
