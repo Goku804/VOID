@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -66,7 +67,7 @@ private val TextSecondary = Color(0xFF7A8B84)
 private val Accent = Color(0xFF00E676)
 
 private const val APP_NAME = "VOID"
-private const val APP_VERSION = "VOID v0.1.1"
+private const val APP_VERSION = "VOID v0.3.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -103,6 +104,7 @@ fun VoidApp() {
                         2 -> AcademicScreen()
                         3 -> ExecutionScreen()
                         4 -> ReportsScreen()
+                        5 -> SetupScreen()
                     }
                 }
 
@@ -148,6 +150,14 @@ fun VoidApp() {
                         onClick = { selectedScreen = 4 },
                         icon = { Icon(Icons.Default.Assessment, "Reports") },
                         label = { Text("REPORTS") },
+                        colors = navigationColors()
+                    )
+
+                    NavigationBarItem(
+                        selected = selectedScreen == 5,
+                        onClick = { selectedScreen = 5 },
+                        icon = { Icon(Icons.Default.Settings, "Setup") },
+                        label = { Text("SETUP") },
                         colors = navigationColors()
                     )
                 }
@@ -277,6 +287,16 @@ fun HomeScreen() {
         }
 
         item {
+            NearestExamCountdown()
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        item {
+            val today = todayAsVoidDay()
+            val todaysClasses = com.core.voidapp.data.VoidRepository.scheduleFor(today)
+            val doneTasks = com.core.voidapp.data.VoidRepository.temporaryTasks.count { it.isCompleted }
+            val remainingTasks = com.core.voidapp.data.VoidRepository.temporaryTasks.count { !it.isCompleted }
+
             SectionTitle("TODAY STATUS")
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -284,8 +304,8 @@ fun HomeScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GlowStatusCard("PLANNED", "00", Modifier.weight(1f))
-                GlowStatusCard("DONE", "00", Modifier.weight(1f))
+                GlowStatusCard("CLASSES", todaysClasses.size.toString().padStart(2, '0'), Modifier.weight(1f))
+                GlowStatusCard("DONE", doneTasks.toString().padStart(2, '0'), Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -294,8 +314,47 @@ fun HomeScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GlowStatusCard("REMAINING", "00", Modifier.weight(1f))
+                GlowStatusCard("REMAINING", remainingTasks.toString().padStart(2, '0'), Modifier.weight(1f))
                 GlowStatusCard("STUDY", "00:00", Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        item {
+            SectionTitle("TODAY'S CLASSES")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val today = todayAsVoidDay()
+            val todaysClasses = com.core.voidapp.data.VoidRepository.scheduleFor(today)
+
+            GlowPanelCard {
+                if (todaysClasses.isEmpty()) {
+                    Text(
+                        text = "No classes set for today. Add them in SETUP.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                } else {
+                    todaysClasses.forEach { period ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Text(
+                                text = "P${period.periodNumber}",
+                                color = Accent,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.width(36.dp)
+                            )
+                            Text(
+                                text = com.core.voidapp.data.VoidRepository.subjectName(period.subjectId),
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -332,6 +391,59 @@ fun HomeScreen() {
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Maps the real device date to our own DayOfWeekVoid enum. */
+fun todayAsVoidDay(): com.core.voidapp.data.DayOfWeekVoid {
+    val d = java.time.LocalDate.now().dayOfWeek
+    return com.core.voidapp.data.DayOfWeekVoid.valueOf(d.name)
+}
+
+/** Live countdown card to the nearest upcoming exam — reads real device time. */
+@Composable
+fun NearestExamCountdown() {
+    val exam = com.core.voidapp.data.VoidRepository.nearestExam()
+
+    GlowPanelCard {
+        Text(
+            text = "NEXT EXAM",
+            color = TextSecondary,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (exam == null) {
+            Text(
+                text = "No exams scheduled. Add one in ACADEMIC.",
+                color = TextPrimary,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        } else {
+            val cd = exam.countdown()
+            Text(
+                text = "${exam.title} \u00b7 ${com.core.voidapp.data.VoidRepository.subjectName(exam.subjectId)}",
+                color = TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = buildString {
+                    if (cd.years > 0) append("${cd.years}y ")
+                    if (cd.months > 0 || cd.years > 0) append("${cd.months}m ")
+                    append("${cd.days}d")
+                    append("  (${cd.totalDays} days total)")
+                },
+                color = Accent,
+                fontSize = 18.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
             )
         }
     }
