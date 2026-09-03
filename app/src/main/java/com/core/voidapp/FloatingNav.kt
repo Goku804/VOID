@@ -10,10 +10,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -47,7 +51,6 @@ enum class VoidDestination(val label: String, val icon: ImageVector) {
 /**
  * Tracks scroll direction so the caller can hide/reveal the floating nav —
  * Telegram-style: scroll down = hide, scroll up = reveal.
- * Attach the returned Modifier's nestedScroll to the scrolling content container.
  */
 class NavVisibilityState {
     var visible = mutableStateOf(true)
@@ -81,51 +84,72 @@ fun FloatingBottomNav(
         Row(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 14.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(VoidColors.Surface)
-                .border(1.dp, VoidColors.Border, RoundedCornerShape(28.dp))
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+                .border(1.dp, VoidColors.Border, RoundedCornerShape(24.dp))
+                .padding(vertical = 10.dp),
         ) {
             VoidDestination.entries.forEach { dest ->
-                NavPillItem(
+                NavItem(
                     destination = dest,
                     isSelected = dest == selected,
-                    onClick = { onSelect(dest) }
+                    onClick = { onSelect(dest) },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
     }
 }
 
+/**
+ * Telegram-style: icon above label, BOTH always visible, only the color
+ * changes on selection. No background pill — matches the reference image.
+ * Selected icon gets a soft layered glow behind it (cheap: 2 stacked
+ * translucent circles, no real blur).
+ */
 @Composable
-private fun NavPillItem(destination: VoidDestination, isSelected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (isSelected) VoidColors.Accent.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
+private fun NavItem(
+    destination: VoidDestination,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tint = if (isSelected) VoidColors.NavAccent else VoidColors.TextPrimary
+
+    Column(
+        modifier = modifier.clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(contentAlignment = Alignment.Center) {
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(VoidColors.NavAccent.copy(alpha = 0.10f))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(VoidColors.NavAccent.copy(alpha = 0.16f))
+                )
+            }
             Icon(
                 imageVector = destination.icon,
                 contentDescription = destination.label,
-                tint = if (isSelected) VoidColors.Accent else VoidColors.TextSecondary,
-                modifier = Modifier.width(20.dp)
+                tint = tint,
+                modifier = Modifier.size(22.dp)
             )
-            if (isSelected) {
-                Box(modifier = Modifier.width(6.dp))
-                Text(
-                    text = destination.label,
-                    color = VoidColors.Accent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
         }
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = destination.label,
+            color = tint,
+            fontSize = 9.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }

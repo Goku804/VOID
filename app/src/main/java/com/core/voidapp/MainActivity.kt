@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.countdown
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.5.0"
+const val APP_VERSION = "VOID v0.5.1"
 
 class MainActivity : ComponentActivity() {
 
@@ -86,12 +86,14 @@ fun VoidApp() {
 
 @Composable
 fun HomeScreen() {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(VoidColors.Background)
-            .padding(16.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(VoidColors.Background)) {
+        ParticleField(modifier = Modifier.fillMaxSize())
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
 
         item {
             Text(
@@ -208,6 +210,7 @@ fun HomeScreen() {
                 fontFamily = FontFamily.Monospace
             )
             Spacer(modifier = Modifier.height(90.dp)) // clears the floating nav
+            }
         }
     }
 }
@@ -223,7 +226,7 @@ fun todayAsVoidDay(): com.core.voidapp.data.DayOfWeekVoid {
 fun NearestExamCountdown() {
     val exam = com.core.voidapp.data.VoidRepository.nearestExam()
 
-    VoidCard {
+    GlowCard {
         Text(
             text = "NEXT EXAM",
             color = VoidColors.TextSecondary,

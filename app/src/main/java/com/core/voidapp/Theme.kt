@@ -21,6 +21,11 @@ object VoidColors {
     val Danger = Color(0xFFFF3D3D)   // Red = serious problem / overdue
     val Info = Color(0xFF2196F3)     // Blue = information
     val Analytics = Color(0xFF9C6CFF) // Purple = analytics/intelligence
+
+    // Distinct accent for the floating nav only — kept separate from the
+    // green academic-status accent so navigation reads as its own layer,
+    // per feedback that all-green everywhere was flat.
+    val NavAccent = Color(0xFF22D3EE) // electric cyan
 }
 
 /** Animation timing constants per spec — keep all transitions in this range. */
