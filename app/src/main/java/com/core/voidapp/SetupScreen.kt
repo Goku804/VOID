@@ -48,13 +48,13 @@ import com.core.voidapp.data.VoidRepository
 import com.core.voidapp.data.totalWeight
 
 private val SBlack = Color(0xFF050505)
-private val SPanel = Color(0xFF0B0F0D)
-private val SPanel2 = Color(0xFF101512)
-private val SBorder = Color(0xFF1E2A24)
+private val SPanel = Color(0xFF0D0D0D)
+private val SPanel2 = Color(0xFF121212)
+private val SBorder = Color(0xFF242424)
 private val SText = Color(0xFFF2F2F2)
-private val SMuted = Color(0xFF7A8B84)
+private val SMuted = Color(0xFF888888)
 private val SAccent = Color(0xFF00E676)
-private val SWarn = Color(0xFFFF5252)
+private val SWarn = Color(0xFFFFB300)
 
 @Composable
 fun SetupScreen() {
