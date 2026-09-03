@@ -12,8 +12,8 @@ android {
         applicationId = "com.core.voidapp"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.2.0"
     }
 
     buildFeatures {
@@ -23,6 +23,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Needed for java.time (LocalDate etc.) to work below API 26.
+        // Your Lenovo runs Android 9 / API 28 so it doesn't strictly need this,
+        // but minSdk 23 means the app could otherwise crash on older test devices.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -37,4 +41,5 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.7.8")
     implementation("androidx.compose.material3:material3:1.3.1")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }

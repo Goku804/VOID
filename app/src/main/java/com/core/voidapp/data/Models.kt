@@ -1,0 +1,129 @@
+package com.core.voidapp.data
+
+import java.time.LocalDate
+import java.time.LocalTime
+
+/**
+ * VOID core data models.
+ * Nothing here is hardcoded content — these are just the shapes.
+ * All actual data (subjects, schedule, exams, marks) is entered by the user.
+ */
+
+enum class DayOfWeekVoid {
+    MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+}
+
+enum class ExamType {
+    TEST, ASSIGNMENT, MID, FINAL, MOCK
+}
+
+/**
+ * A subject the user is studying (e.g. Maths, Physics, English).
+ * Holds its own assessment weight breakdown, since that varies per subject.
+ */
+data class Subject(
+    val id: String,
+    val name: String,
+    val grade: Int,
+    val assessmentTypes: MutableList<AssessmentType> = mutableListOf()
+)
+
+/**
+ * One graded component inside a subject (e.g. "Mid" worth 20%).
+ * weightPercent is user-defined per subject — not shared globally.
+ */
+data class AssessmentType(
+    val id: String,
+    val examType: ExamType,
+    val label: String,       // display name, e.g. "Mid Exam"
+    val weightPercent: Double,
+    val maxScore: Double,
+    var entry: MarkEntry? = null
+)
+
+/** The actual score the user got for one AssessmentType. */
+data class MarkEntry(
+    val score: Double,
+    val dateRecorded: LocalDate = LocalDate.now()
+)
+
+/**
+ * One period in the weekly class schedule.
+ * day + period together define the slot; subjectId points at a Subject.
+ */
+data class ClassPeriod(
+    val id: String,
+    val day: DayOfWeekVoid,
+    val periodNumber: Int,
+    val subjectId: String,
+    val startTime: LocalTime? = null,
+    val endTime: LocalTime? = null,
+    val location: String? = null
+)
+
+/**
+ * An exam/test event with a real date, used to drive the live countdown.
+ */
+data class Exam(
+    val id: String,
+    val subjectId: String,
+    val type: ExamType,
+    val title: String,
+    val date: LocalDate
+)
+
+/** A one-off task — homework, urgent revision, anything not part of the normal plan. */
+data class TemporaryTask(
+    val id: String,
+    val title: String,
+    val subjectId: String? = null,
+    val dueDate: LocalDate,
+    val isCompleted: Boolean = false,
+    val isHighPriority: Boolean = false
+)
+
+/**
+ * Computes weighted total (0-100 scale) for a subject from whatever
+ * AssessmentTypes currently have an entry. Missing entries are skipped,
+ * not counted as zero, so a partial term still shows a fair running total.
+ */
+fun Subject.weightedTotal(): Double {
+    val graded = assessmentTypes.filter { it.entry != null }
+    if (graded.isEmpty()) return 0.0
+
+    val totalWeightGraded = graded.sumOf { it.weightPercent }
+    if (totalWeightGraded == 0.0) return 0.0
+
+    val earned = graded.sumOf { type ->
+        val pct = (type.entry!!.score / type.maxScore) * type.weightPercent
+        pct
+    }
+
+    // Scale to the weight actually graded so an in-progress term still reads 0-100 fairly.
+    return earned
+}
+
+/** Sum of all weight percentages currently defined for the subject. Should equal 100. */
+fun Subject.totalWeight(): Double = assessmentTypes.sumOf { it.weightPercent }
+
+/** True once every AssessmentType for the subject has a recorded score. */
+fun Subject.isFullyGraded(): Boolean = assessmentTypes.isNotEmpty() && assessmentTypes.all { it.entry != null }
+
+/** Days between today and the exam date. Negative if the date has passed. */
+fun Exam.daysRemaining(): Long =
+    java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)
+
+/** Exact years / months / days remaining, for a readable long-range countdown. */
+data class Countdown(val years: Int, val months: Int, val days: Int, val totalDays: Long)
+
+fun Exam.countdown(): Countdown {
+    val today = LocalDate.now()
+    val period = java.time.Period.between(today, date)
+    val totalDays = java.time.temporal.ChronoUnit.DAYS.between(today, date)
+    return Countdown(
+        years = period.years,
+        months = period.months,
+        days = period.days,
+        totalDays = totalDays
+    )
+}
