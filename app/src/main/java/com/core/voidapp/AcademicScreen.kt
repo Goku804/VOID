@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.core.voidapp.data.AcademicUnit
 import com.core.voidapp.data.AssessmentType
 import com.core.voidapp.data.Exam
 import com.core.voidapp.data.ExamType
@@ -61,9 +62,11 @@ private val AMuted = Color(0xFF888888)
 private val AAccent = Color(0xFF00E676)
 private val AWarn = Color(0xFFFF3D3D)
 
+private enum class AcademicTab { SUBJECTS, UNITS, MARKS, EXAMS }
+
 @Composable
 fun AcademicScreenReal() {
-    var section by remember { mutableStateOf(0) } // 0 = subjects/marks, 1 = exams
+    var tab by remember { mutableStateOf(AcademicTab.SUBJECTS) }
 
     Column(
         modifier = Modifier
@@ -73,20 +76,24 @@ fun AcademicScreenReal() {
     ) {
         Text("VOID", color = AAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
         Text("ACADEMIC", color = AText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Text("SUBJECTS \u2022 MARKS \u2022 EXAMS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text("SUBJECTS \u2022 UNITS \u2022 MARKS \u2022 EXAMS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ATab("MARKS", section == 0, Modifier.weight(1f)) { section = 0 }
-            ATab("EXAMS", section == 1, Modifier.weight(1f)) { section = 1 }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ATab("SUBJ", tab == AcademicTab.SUBJECTS, Modifier.weight(1f)) { tab = AcademicTab.SUBJECTS }
+            ATab("UNITS", tab == AcademicTab.UNITS, Modifier.weight(1f)) { tab = AcademicTab.UNITS }
+            ATab("MARKS", tab == AcademicTab.MARKS, Modifier.weight(1f)) { tab = AcademicTab.MARKS }
+            ATab("EXAMS", tab == AcademicTab.EXAMS, Modifier.weight(1f)) { tab = AcademicTab.EXAMS }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        when (section) {
-            0 -> MarksSection()
-            1 -> ExamsSection()
+        when (tab) {
+            AcademicTab.SUBJECTS -> SubjectsTab()
+            AcademicTab.UNITS -> UnitsTab()
+            AcademicTab.MARKS -> MarksSection()
+            AcademicTab.EXAMS -> ExamsSection()
         }
     }
 }
@@ -104,12 +111,165 @@ private fun ATab(label: String, selected: Boolean, modifier: Modifier = Modifier
         Text(
             text = label,
             color = if (selected) AAccent else AMuted,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
+    }
+}
+
+// ---------------------------------------------------------------------
+// SUBJECTS
+// ---------------------------------------------------------------------
+
+@Composable
+private fun SubjectsTab() {
+    var name by remember { mutableStateOf("") }
+    var grade by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            APanelCard {
+                Text("REGISTER SUBJECT", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                AField(value = name, onValueChange = { name = it }, label = "Subject name (e.g. Mathematics)")
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AField(value = grade, onValueChange = { grade = it }, label = "Grade", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                    AField(value = code, onValueChange = { code = it.uppercase() }, label = "Code (e.g. MATH)", modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                ABigButton("+ SAVE SUBJECT") {
+                    val g = grade.toIntOrNull()
+                    if (name.isNotBlank() && g != null) {
+                        VoidRepository.addSubject(name.trim(), g, code.trim())
+                        name = ""; grade = ""; code = ""
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            Text("YOUR SUBJECTS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (VoidRepository.subjects.isEmpty()) {
+            item { Text("No subjects yet.", color = AMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+        }
+
+        items(VoidRepository.subjects) { subject ->
+            APanelCard {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(subject.name, color = AText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Grade ${subject.grade}" + if (subject.code.isNotBlank()) " \u00b7 ${subject.code}" else "",
+                            color = AMuted,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Text(
+                        text = "${VoidRepository.unitsFor(subject.id).size} units",
+                        color = AMuted,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+}
+
+// ---------------------------------------------------------------------
+// UNITS
+// ---------------------------------------------------------------------
+
+@Composable
+private fun UnitsTab() {
+    var subjectId by remember { mutableStateOf<String?>(null) }
+    var unitNumber by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var minutes by remember { mutableStateOf("") }
+
+    if (VoidRepository.subjects.isEmpty()) {
+        EmptyHint("No subjects yet. Add one in the SUBJ tab first.")
+        return
+    }
+
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            APanelCard {
+                Text("REGISTER UNIT", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                ASubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it })
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AField(value = unitNumber, onValueChange = { unitNumber = it }, label = "Unit #", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                    AField(value = minutes, onValueChange = { minutes = it }, label = "Est. minutes", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                AField(value = name, onValueChange = { name = it }, label = "Unit name (e.g. Functions)")
+                Spacer(modifier = Modifier.height(6.dp))
+                AField(value = description, onValueChange = { description = it }, label = "Description (optional)")
+
+                Spacer(modifier = Modifier.height(10.dp))
+                ABigButton("+ SAVE UNIT") {
+                    val sid = subjectId
+                    val num = unitNumber.toIntOrNull()
+                    val mins = minutes.toIntOrNull() ?: 0
+                    if (sid != null && num != null && name.isNotBlank()) {
+                        VoidRepository.addUnit(sid, num, name.trim(), description.trim(), mins)
+                        unitNumber = ""; name = ""; description = ""; minutes = ""
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        items(VoidRepository.subjects) { subject ->
+            val subjectUnits = VoidRepository.unitsFor(subject.id)
+            if (subjectUnits.isNotEmpty()) {
+                Text(subject.name.uppercase(), color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                APanelCard {
+                    subjectUnits.forEachIndexed { idx, unit ->
+                        UnitRow(unit)
+                        if (idx != subjectUnits.lastIndex) Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+}
+
+@Composable
+private fun UnitRow(unit: AcademicUnit) {
+    Column {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("U${unit.unitNumber}", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp))
+            Text(unit.name, color = AText, fontSize = 13.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            if (unit.estimatedStudyMinutes > 0) {
+                Text("${unit.estimatedStudyMinutes}min", color = AMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            }
+        }
+        if (unit.description.isNotBlank()) {
+            Text(unit.description, color = AMuted, fontSize = 10.sp, modifier = Modifier.padding(start = 32.dp))
+        }
     }
 }
 
@@ -120,7 +280,7 @@ private fun ATab(label: String, selected: Boolean, modifier: Modifier = Modifier
 @Composable
 private fun MarksSection() {
     if (VoidRepository.subjects.isEmpty()) {
-        EmptyHint("No subjects yet. Add subjects in SETUP first.")
+        EmptyHint("No subjects yet. Add subjects in the SUBJ tab first.")
         return
     }
 
@@ -129,7 +289,7 @@ private fun MarksSection() {
             SubjectMarksCard(subject)
             Spacer(modifier = Modifier.height(12.dp))
         }
-        item { Spacer(modifier = Modifier.height(30.dp)) }
+        item { Spacer(modifier = Modifier.height(90.dp)) }
     }
 }
 
@@ -159,18 +319,59 @@ private fun SubjectMarksCard(subject: Subject) {
         if (subject.assessmentTypes.isEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "No assessment types set. Add them in SETUP.",
+                text = "No assessment types set yet.",
                 color = AMuted,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
-            return@APanelCard
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
         subject.assessmentTypes.forEach { type ->
             MarkEntryRow(subject, type)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        AddAssessmentInline(subject)
+    }
+}
+
+@Composable
+private fun AddAssessmentInline(subject: Subject) {
+    var expanded by remember { mutableStateOf(false) }
+    var examType by remember { mutableStateOf(ExamType.TEST) }
+    var label by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+    var maxScore by remember { mutableStateOf("") }
+
+    Text(
+        text = if (expanded) "\u2212 CANCEL" else "+ ADD ASSESSMENT TYPE",
+        color = AAccent,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.clickable { expanded = !expanded }
+    )
+
+    if (expanded) {
+        Spacer(modifier = Modifier.height(8.dp))
+        AExamTypeDropdown(selected = examType, onSelected = { examType = it })
+        Spacer(modifier = Modifier.height(6.dp))
+        AField(value = label, onValueChange = { label = it }, label = "Label (e.g. Mid Exam)")
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AField(value = weight, onValueChange = { weight = it }, label = "Weight %", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+            AField(value = maxScore, onValueChange = { maxScore = it }, label = "Max score", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        ASmallButton("+ ADD") {
+            val w = weight.toDoubleOrNull()
+            val m = maxScore.toDoubleOrNull()
+            if (label.isNotBlank() && w != null && m != null) {
+                VoidRepository.addAssessmentType(subject.id, examType, label.trim(), w, m)
+                label = ""; weight = ""; maxScore = ""; expanded = false
+            }
         }
     }
 }
@@ -182,25 +383,11 @@ private fun MarkEntryRow(subject: Subject, type: AssessmentType) {
 
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { editing = !editing },
+            modifier = Modifier.fillMaxWidth().clickable { editing = !editing },
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Text(
-                text = type.label,
-                color = AText,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "${type.weightPercent.toInt()}%",
-                color = AMuted,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(end = 8.dp)
-            )
+            Text(type.label, color = AText, fontSize = 12.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            Text("${type.weightPercent.toInt()}%", color = AMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(end = 8.dp))
             Text(
                 text = type.entry?.let { "${it.score.toInt()}/${type.maxScore.toInt()}" } ?: "\u2014 / ${type.maxScore.toInt()}",
                 color = if (type.entry != null) AAccent else AMuted,
@@ -213,13 +400,7 @@ private fun MarkEntryRow(subject: Subject, type: AssessmentType) {
         if (editing) {
             Spacer(modifier = Modifier.height(6.dp))
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                AField(
-                    value = scoreText,
-                    onValueChange = { scoreText = it },
-                    label = "Score",
-                    keyboardType = KeyboardType.Decimal,
-                    modifier = Modifier.weight(1f)
-                )
+                AField(value = scoreText, onValueChange = { scoreText = it }, label = "Score", keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(8.dp))
                 ASmallButton("SAVE") {
                     val s = scoreText.toDoubleOrNull()
@@ -253,7 +434,7 @@ private fun ExamsSection() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (VoidRepository.subjects.isEmpty()) {
-                    Text("Add a subject in SETUP first.", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Text("Add a subject in the SUBJ tab first.", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 } else {
                     ASubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it })
                     Spacer(modifier = Modifier.height(6.dp))
@@ -279,9 +460,7 @@ private fun ExamsSection() {
                             try {
                                 val date = LocalDate.parse(dateText.trim())
                                 VoidRepository.addExam(sid, examType, title.trim(), date)
-                                title = ""
-                                dateText = ""
-                                error = null
+                                title = ""; dateText = ""; error = null
                             } catch (e: Exception) {
                                 error = "Date must be YYYY-MM-DD"
                             }
@@ -299,9 +478,7 @@ private fun ExamsSection() {
 
         val upcoming = VoidRepository.upcomingExams()
         if (upcoming.isEmpty()) {
-            item {
-                Text("No upcoming exams.", color = AMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-            }
+            item { Text("No upcoming exams.", color = AMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
         }
 
         items(upcoming) { exam ->
@@ -309,7 +486,7 @@ private fun ExamsSection() {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        item { Spacer(modifier = Modifier.height(30.dp)) }
+        item { Spacer(modifier = Modifier.height(90.dp)) }
     }
 }
 
@@ -338,6 +515,10 @@ private fun ExamRow(exam: Exam) {
     }
 }
 
+// ---------------------------------------------------------------------
+// SHARED DROPDOWNS
+// ---------------------------------------------------------------------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ASubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
@@ -357,6 +538,9 @@ private fun ASubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) 
             Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AMuted)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (VoidRepository.subjects.isEmpty()) {
+                DropdownMenuItem(text = { Text("Add a subject first") }, onClick = { open = false })
+            }
             VoidRepository.subjects.forEach { subject ->
                 DropdownMenuItem(text = { Text(subject.name) }, onClick = { onSelected(subject.id); open = false })
             }
@@ -395,7 +579,7 @@ private fun AExamTypeDropdown(selected: ExamType, onSelected: (ExamType) -> Unit
 
 @Composable
 private fun EmptyHint(text: String) {
-    Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp, start = 16.dp, end = 16.dp)) {
         Text(text, color = AMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
     }
 }

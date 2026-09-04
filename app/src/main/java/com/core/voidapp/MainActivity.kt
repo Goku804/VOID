@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.countdown
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.5.1"
+const val APP_VERSION = "VOID v0.7.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -52,6 +52,12 @@ class MainActivity : ComponentActivity() {
 fun VoidApp() {
     var selectedDest by remember { mutableStateOf(VoidDestination.HOME) }
     val navVisibility = rememberNavVisibilityState()
+
+    // Back should return to HOME first, then exit on a second press —
+    // matches normal Android behavior instead of closing from any tab.
+    androidx.activity.compose.BackHandler(enabled = selectedDest != VoidDestination.HOME) {
+        selectedDest = VoidDestination.HOME
+    }
 
     MaterialTheme {
         Surface(

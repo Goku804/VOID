@@ -51,6 +51,12 @@ private enum class SettingsSection(val title: String, val subtitle: String, val 
 fun SettingsScreen() {
     var open by remember { mutableStateOf<SettingsSection?>(null) }
 
+    // Back (gesture swipe OR hardware/software button — same API covers both)
+    // should step OUT of a sub-screen, not close the app.
+    androidx.activity.compose.BackHandler(enabled = open != null) {
+        open = null
+    }
+
     when (val section = open) {
         null -> SettingsList(onOpen = { open = it })
         SettingsSection.ACADEMIC -> SettingsSubScreen(section.title, onBack = { open = null }) {

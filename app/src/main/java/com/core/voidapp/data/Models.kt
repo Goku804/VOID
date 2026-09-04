@@ -17,14 +17,16 @@ enum class ExamType {
     TEST, ASSIGNMENT, MID, FINAL, MOCK
 }
 
-/**
- * A subject the user is studying (e.g. Maths, Physics, English).
- * Holds its own assessment weight breakdown, since that varies per subject.
- */
+enum class ClassType {
+    REGULAR, D_CLASS, LANGUAGE, LAB, LIBRARY, STUDY, NIGHT_STUDY, EXAM
+}
+
+/** Subject code, e.g. "MATH" — short label used in dense timetable views. */
 data class Subject(
     val id: String,
     val name: String,
     val grade: Int,
+    val code: String = "",
     val assessmentTypes: MutableList<AssessmentType> = mutableListOf()
 )
 
@@ -56,9 +58,35 @@ data class ClassPeriod(
     val day: DayOfWeekVoid,
     val periodNumber: Int,
     val subjectId: String,
+    val classType: ClassType = ClassType.REGULAR,
     val startTime: LocalTime? = null,
     val endTime: LocalTime? = null,
     val location: String? = null
+)
+
+/**
+ * A unit within a subject (e.g. Mathematics Grade 11 Unit 2 — Functions).
+ * Belongs to Academic data — Circle Plans and Exam Prep read from this later.
+ * Named AcademicUnit to avoid clashing with kotlin.Unit.
+ */
+data class AcademicUnit(
+    val id: String,
+    val subjectId: String,
+    val unitNumber: Int,
+    val name: String,
+    val description: String = "",
+    val estimatedStudyMinutes: Int = 0
+)
+
+/**
+ * Night study availability for one day of the week. Must be configurable
+ * per day — VOID must never assume every night has the same window.
+ */
+data class NightAvailability(
+    val day: DayOfWeekVoid,
+    val available: Boolean,
+    val start: LocalTime? = null,
+    val end: LocalTime? = null
 )
 
 /**
