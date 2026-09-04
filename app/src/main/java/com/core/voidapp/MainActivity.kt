@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.countdown
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.8.0"
+const val APP_VERSION = "VOID v0.9.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -133,8 +133,8 @@ fun HomeScreen() {
         item {
             val today = todayAsVoidDay()
             val todaysClasses = com.core.voidapp.data.VoidRepository.scheduleFor(today)
-            val doneTasks = com.core.voidapp.data.VoidRepository.temporaryTasks.count { it.isCompleted }
-            val remainingTasks = com.core.voidapp.data.VoidRepository.temporaryTasks.count { !it.isCompleted }
+            val doneTasks = com.core.voidapp.data.VoidRepository.temporaryTasks.count { it.status == com.core.voidapp.data.PlanTaskStatus.COMPLETED }
+            val remainingTasks = com.core.voidapp.data.VoidRepository.activeTemporaryTasks().size
 
             VoidSectionLabel("TODAY STATUS")
             Spacer(modifier = Modifier.height(8.dp))

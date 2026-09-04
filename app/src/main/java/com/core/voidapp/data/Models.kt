@@ -135,14 +135,41 @@ data class Exam(
 )
 
 /** A one-off task — homework, urgent revision, anything not part of the normal plan. */
+enum class TemporaryPlanType {
+    TEST, ASSIGNMENT, HOMEWORK, EXTRA_CLASS, TEACHER_REQUEST,
+    PROJECT, MAKE_UP_CLASS, URGENT_REVISION, MISSED_WORK_RECOVERY, OTHER
+}
+
+enum class PlanTaskStatus { PLANNED, IN_PROGRESS, COMPLETED, PARTIAL, MISSED, CANCELLED }
+
+/**
+ * Short-term interruption or addition — never deletes a Circle Plan slot,
+ * the (future) Priority Engine reschedules the Circle Plan around it instead.
+ */
 data class TemporaryTask(
     val id: String,
     val title: String,
+    val type: TemporaryPlanType = TemporaryPlanType.OTHER,
     val subjectId: String? = null,
-    val dueDate: LocalDate,
-    val isCompleted: Boolean = false,
-    val isHighPriority: Boolean = false
+    val startDate: LocalDate? = null,
+    val deadline: LocalDate,
+    val requiredMinutes: Int = 0,
+    val completedMinutes: Int = 0,
+    val priority: PlanPriority = PlanPriority.NORMAL,
+    val unitIds: List<String> = emptyList(),
+    val notes: String = "",
+    val status: PlanTaskStatus = PlanTaskStatus.PLANNED
 )
+
+fun TemporaryTask.daysUntilDeadline(): Long =
+    java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), deadline)
+
+fun TemporaryTask.progressPercent(): Int =
+    if (requiredMinutes <= 0) 0
+    else ((completedMinutes.toFloat() / requiredMinutes) * 100).toInt().coerceIn(0, 100)
+
+fun TemporaryTask.isOverdue(): Boolean =
+    status != PlanTaskStatus.COMPLETED && status != PlanTaskStatus.CANCELLED && daysUntilDeadline() < 0
 
 /**
  * Computes weighted total (0-100 scale) for a subject from whatever

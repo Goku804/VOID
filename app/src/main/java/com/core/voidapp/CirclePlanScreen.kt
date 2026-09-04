@@ -53,32 +53,7 @@ import com.core.voidapp.data.VoidRepository
 import com.core.voidapp.data.resolvedUnit
 
 @Composable
-fun PlanningScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(VoidColors.Background)
-            .padding(16.dp)
-    ) {
-        Text(APP_NAME, color = VoidColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-        Text("PLAN", color = VoidColors.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Text("CIRCLE PLANS", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "TEMPORARY \u00b7 EXAM PREP \u2014 coming later",
-            color = VoidColors.TextSecondary,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CirclePlansContent()
-    }
-}
-
-@Composable
-private fun CirclePlansContent() {
+fun CirclePlansContent() {
     var day by remember { mutableStateOf(DayOfWeekVoid.MONDAY) }
     var subjectId by remember { mutableStateOf<String?>(null) }
     var duration by remember { mutableStateOf("") }

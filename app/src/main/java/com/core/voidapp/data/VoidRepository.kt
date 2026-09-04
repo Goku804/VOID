@@ -176,25 +176,58 @@ object VoidRepository {
 
     fun addTemporaryTask(
         title: String,
+        type: TemporaryPlanType,
         subjectId: String?,
-        dueDate: java.time.LocalDate,
-        highPriority: Boolean = false
-    ) {
-        temporaryTasks.add(
-            TemporaryTask(
-                id = newId(),
-                title = title,
-                subjectId = subjectId,
-                dueDate = dueDate,
-                isHighPriority = highPriority
-            )
+        startDate: java.time.LocalDate?,
+        deadline: java.time.LocalDate,
+        requiredMinutes: Int,
+        priority: PlanPriority,
+        unitIds: List<String> = emptyList(),
+        notes: String = ""
+    ): TemporaryTask {
+        val task = TemporaryTask(
+            id = newId(),
+            title = title,
+            type = type,
+            subjectId = subjectId,
+            startDate = startDate,
+            deadline = deadline,
+            requiredMinutes = requiredMinutes,
+            priority = priority,
+            unitIds = unitIds,
+            notes = notes
         )
+        temporaryTasks.add(task)
+        return task
     }
 
-    fun toggleTaskDone(taskId: String) {
+    fun addProgress(taskId: String, minutes: Int) {
         val idx = temporaryTasks.indexOfFirst { it.id == taskId }
         if (idx == -1) return
         val task = temporaryTasks[idx]
-        temporaryTasks[idx] = task.copy(isCompleted = !task.isCompleted)
+        val newCompleted = (task.completedMinutes + minutes).coerceAtLeast(0)
+        val newStatus = when {
+            task.requiredMinutes > 0 && newCompleted >= task.requiredMinutes -> PlanTaskStatus.COMPLETED
+            newCompleted > 0 -> PlanTaskStatus.IN_PROGRESS
+            else -> PlanTaskStatus.PLANNED
+        }
+        temporaryTasks[idx] = task.copy(completedMinutes = newCompleted, status = newStatus)
     }
+
+    fun setTaskStatus(taskId: String, status: PlanTaskStatus) {
+        val idx = temporaryTasks.indexOfFirst { it.id == taskId }
+        if (idx == -1) return
+        temporaryTasks[idx] = temporaryTasks[idx].copy(status = status)
+    }
+
+    fun deleteTemporaryTask(taskId: String) {
+        temporaryTasks.removeAll { it.id == taskId }
+    }
+
+    fun activeTemporaryTasks(): List<TemporaryTask> =
+        temporaryTasks.filter { it.status != PlanTaskStatus.COMPLETED && it.status != PlanTaskStatus.CANCELLED }
+            .sortedBy { it.deadline }
+
+    fun temporaryTasksForDay(day: java.time.LocalDate): List<TemporaryTask> =
+        temporaryTasks.filter { it.deadline == day }
 }
