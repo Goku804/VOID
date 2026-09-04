@@ -78,6 +78,40 @@ data class AcademicUnit(
     val estimatedStudyMinutes: Int = 0
 )
 
+enum class PreferredWindow { MORNING, AFTERNOON, NIGHT, ANYTIME }
+
+/** CONTINUE_NEXT_UNIT walks through the subject's units via a manual cursor. FIXED_UNIT stays locked on one. */
+enum class ContentStrategy { CONTINUE_NEXT_UNIT, FIXED_UNIT }
+
+enum class PlanPriority { LOW, NORMAL, HIGH }
+
+/**
+ * A recurring weekly slot: "Monday -> Mathematics". Persistent — survives
+ * Temporary Plans and exams, which only interrupt/overlay it, never delete it.
+ * Content is NOT the same unit forever: currentUnitIndex is a manual cursor
+ * the user advances/rewinds through the subject's unit list.
+ */
+data class CirclePlan(
+    val id: String,
+    val day: DayOfWeekVoid,
+    val subjectId: String,
+    val durationMinutes: Int,
+    val window: PreferredWindow,
+    val strategy: ContentStrategy,
+    val currentUnitIndex: Int = 0,
+    val fixedUnitId: String? = null,
+    val priority: PlanPriority = PlanPriority.NORMAL
+)
+
+/** Resolves which unit is "due" right now for this Circle Plan. */
+fun CirclePlan.resolvedUnit(): AcademicUnit? = when (strategy) {
+    ContentStrategy.FIXED_UNIT -> VoidRepository.units.find { it.id == fixedUnitId }
+    ContentStrategy.CONTINUE_NEXT_UNIT -> {
+        val units = VoidRepository.unitsFor(subjectId)
+        if (units.isEmpty()) null else units[currentUnitIndex.mod(units.size)]
+    }
+}
+
 /**
  * Night study availability for one day of the week. Must be configurable
  * per day — VOID must never assume every night has the same window.

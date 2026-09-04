@@ -20,6 +20,7 @@ object VoidRepository {
     val exams = mutableStateListOf<Exam>()
     val temporaryTasks = mutableStateListOf<TemporaryTask>()
     val nightAvailability = mutableStateListOf<NightAvailability>()
+    val circlePlans = mutableStateListOf<CirclePlan>()
 
     fun newId(): String = UUID.randomUUID().toString()
 
@@ -117,6 +118,47 @@ object VoidRepository {
         val updated = NightAvailability(day = day, available = available, start = start, end = end)
         if (idx == -1) nightAvailability.add(updated) else nightAvailability[idx] = updated
     }
+
+    fun addCirclePlan(
+        day: DayOfWeekVoid,
+        subjectId: String,
+        durationMinutes: Int,
+        window: PreferredWindow,
+        strategy: ContentStrategy,
+        fixedUnitId: String? = null,
+        priority: PlanPriority = PlanPriority.NORMAL
+    ): CirclePlan {
+        val plan = CirclePlan(
+            id = newId(),
+            day = day,
+            subjectId = subjectId,
+            durationMinutes = durationMinutes,
+            window = window,
+            strategy = strategy,
+            fixedUnitId = fixedUnitId,
+            priority = priority
+        )
+        circlePlans.add(plan)
+        return plan
+    }
+
+    fun deleteCirclePlan(planId: String) {
+        circlePlans.removeAll { it.id == planId }
+    }
+
+    /** Manually step the CONTINUE_NEXT_UNIT cursor forward (+1) or back (-1). Wraps around. */
+    fun stepCircleUnit(planId: String, delta: Int) {
+        val idx = circlePlans.indexOfFirst { it.id == planId }
+        if (idx == -1) return
+        val plan = circlePlans[idx]
+        val units = unitsFor(plan.subjectId)
+        if (units.isEmpty()) return
+        val newIndex = (plan.currentUnitIndex + delta).mod(units.size)
+        circlePlans[idx] = plan.copy(currentUnitIndex = newIndex)
+    }
+
+    fun circlePlansFor(day: DayOfWeekVoid): List<CirclePlan> =
+        circlePlans.filter { it.day == day }
 
     fun addExam(subjectId: String, type: ExamType, title: String, date: java.time.LocalDate): Exam {
         val exam = Exam(id = newId(), subjectId = subjectId, type = type, title = title, date = date)

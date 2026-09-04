@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.countdown
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.7.0"
+const val APP_VERSION = "VOID v0.8.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -190,6 +190,31 @@ fun HomeScreen() {
         }
 
         item {
+            VoidSectionLabel("TODAY'S CIRCLE PLAN")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val today = todayAsVoidDay()
+            val todaysCircle = com.core.voidapp.data.VoidRepository.circlePlansFor(today)
+
+            if (todaysCircle.isEmpty()) {
+                VoidCard {
+                    Text(
+                        text = "No Circle Plan for today. Set one up in the PLAN tab.",
+                        color = VoidColors.TextSecondary,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                todaysCircle.forEach { plan ->
+                    CirclePlanRow(plan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
             VoidSectionLabel("SYSTEM STATUS")
             Spacer(modifier = Modifier.height(8.dp))
             VoidCard {
@@ -309,15 +334,6 @@ fun QuickAction(text: String) {
     ) {
         Text(text, color = VoidColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
     }
-}
-
-@Composable
-fun PlanningScreen() {
-    PlaceholderScreen(
-        title = "PLAN",
-        subtitle = "CIRCLE \u00b7 TEMPORARY \u00b7 EXAM PREP",
-        message = "Circle Plans, Temporary Plans, and the Exam Preparation Engine build here — coming per the roadmap."
-    )
 }
 
 @Composable
