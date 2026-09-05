@@ -255,10 +255,10 @@ fun todayAsVoidDay(): com.core.voidapp.data.DayOfWeekVoid {
     return com.core.voidapp.data.DayOfWeekVoid.valueOf(d.name)
 }
 
-/** Live countdown card to the nearest upcoming exam sitting — reads real device time. */
+/** Live countdown card listing every upcoming exam sitting — reads real device time. */
 @Composable
 fun NearestExamCountdown() {
-    val examSubject = com.core.voidapp.data.VoidRepository.nearestExamSubject()
+    val examSubjects = com.core.voidapp.data.VoidRepository.upcomingExamSubjects()
 
     GlowCard {
         Text(
@@ -270,7 +270,7 @@ fun NearestExamCountdown() {
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        if (examSubject == null) {
+        if (examSubjects.isEmpty()) {
             Text(
                 text = "No exams scheduled. Add one in SETTINGS \u2192 EXAMS.",
                 color = VoidColors.TextPrimary,
@@ -278,22 +278,31 @@ fun NearestExamCountdown() {
                 fontFamily = FontFamily.Monospace
             )
         } else {
-            val exam = com.core.voidapp.data.VoidRepository.examFor(examSubject)
-            val status = examSubject.status()
-            Text(
-                text = "${exam?.examType?.name ?: ""} \u00b7 ${com.core.voidapp.data.VoidRepository.subjectName(examSubject.subjectId)}",
-                color = VoidColors.TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = status.label(examSubject.daysRemaining()),
-                color = examCountdownColor(status, examSubject.daysRemaining()),
-                fontSize = 18.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
+            examSubjects.forEachIndexed { index, examSubject ->
+                val exam = com.core.voidapp.data.VoidRepository.examFor(examSubject)
+                val status = examSubject.status()
+                val isNearest = index == 0
+
+                Text(
+                    text = "${exam?.examType?.name ?: ""} \u00b7 ${com.core.voidapp.data.VoidRepository.subjectName(examSubject.subjectId)}",
+                    color = VoidColors.TextPrimary,
+                    fontSize = if (isNearest) 15.sp else 13.sp,
+                    fontWeight = if (isNearest) FontWeight.Bold else FontWeight.Normal,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = status.label(examSubject.daysRemaining()),
+                    color = examCountdownColor(status, examSubject.daysRemaining()),
+                    fontSize = if (isNearest) 18.sp else 14.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+
+                if (index != examSubjects.lastIndex) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
         }
     }
 }
