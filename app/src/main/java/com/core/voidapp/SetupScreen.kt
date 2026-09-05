@@ -146,6 +146,18 @@ private fun TimetableTab() {
                     Spacer(modifier = Modifier.height(6.dp))
 
                     ClassTypeDropdown(selected = classType, onSelected = { classType = it })
+
+                    val isDClassType = classType == ClassType.LANGUAGE || classType == ClassType.LAB
+                    val alreadyHasDClassToday = VoidRepository.scheduleFor(selectedDay).any { it.isDClassSession() }
+                    if (isDClassType && !alreadyHasDClassToday && VoidRepository.dClassDayCount() >= 2) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "You already have D-Class (Language/Lab) on 2 days this week \u2014 adding a 3rd leaves less afternoon study time.",
+                            color = SWarn,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -432,14 +444,14 @@ private fun VoidButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(SAccent.copy(alpha = 0.12f))
-            .border(1.dp, SAccent, RoundedCornerShape(8.dp))
+            .background(VoidColors.Cyan.copy(alpha = 0.12f))
+            .border(1.dp, VoidColors.Cyan, RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vertical = 12.dp)
     ) {
         Text(
             text = text,
-            color = SAccent,
+            color = VoidColors.Cyan,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,

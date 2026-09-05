@@ -354,14 +354,14 @@ private fun PBigButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(VoidColors.Accent.copy(alpha = 0.12f))
-            .border(1.dp, VoidColors.Accent, RoundedCornerShape(8.dp))
+            .background(VoidColors.Cyan.copy(alpha = 0.12f))
+            .border(1.dp, VoidColors.Cyan, RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vertical = 12.dp)
     ) {
         Text(
             text = text,
-            color = VoidColors.Accent,
+            color = VoidColors.Cyan,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,

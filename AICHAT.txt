@@ -1,0 +1,1012 @@
+We are continuing development of the Android app VOID.
+
+Before changing code, understand and implement the following specifications exactly. Do not simplify them, replace them with hard-coded examples, or invent alternative meanings.
+
+1. VOID VISUAL DESIGN — NEW COLOR SYSTEM
+
+The current green + black approach is too repetitive.
+
+VOID must remain dark, futuristic, serious, clean, and information-dense, but it must use a controlled multi-color semantic system.
+
+Do NOT make the application look like a rainbow or gaming UI.
+
+Colors must communicate meaning.
+
+Base colors
+
+BACKGROUND:
+#050505
+
+SURFACE:
+#0D0D0D
+
+SURFACE_2:
+#121212
+
+BORDER:
+#242424
+
+PRIMARY_TEXT:
+#F2F2F2
+
+SECONDARY_TEXT:
+#888888
+
+Semantic colors
+
+SUCCESS:
+#00E676
+Meaning:
+
+- completed
+- healthy
+- successful
+- active/healthy state
+- successful backup
+- successful restore
+- successful Telegram connection
+
+INFO:
+#42A5F5
+Meaning:
+
+- information
+- timetable
+- normal classes
+- informational status
+- neutral academic information
+
+CYAN:
+#00CFE8
+Meaning:
+
+- interaction
+- navigation
+- primary interactive controls
+- selected navigation item
+- AI interaction
+- buttons requiring user action
+
+PURPLE:
+#9C6CFF
+Meaning:
+
+- intelligence
+- analytics
+- reports
+- AI
+- exam preparation
+- planning analysis
+
+WARNING:
+#FFB300
+Meaning:
+
+- attention required
+- approaching deadline
+- schedule conflict
+- weak area
+- approaching exam
+
+DANGER:
+#FF3D4D
+Meaning:
+
+- urgent
+- overdue
+- serious error
+- critical exam state
+- destructive action
+
+Do not use semantic colors merely for decoration.
+
+2. COLOR USAGE BY UI COMPONENT
+
+Cards
+
+Cards should remain primarily dark.
+
+Normal:
+#0D0D0D
+
+Elevated:
+#121212
+
+Do NOT make every card a different color.
+
+Instead, use small semantic indicators inside cards.
+
+Example:
+
+NEXT CLASS
+blue indicator
+
+EXAM PREPARATION
+purple indicator
+
+URGENT PLAN
+red indicator
+
+COMPLETED TASK
+green indicator
+
+Borders
+
+Normal borders:
+#242424
+
+Focused/selected:
+CYAN
+
+Warning:
+AMBER
+
+Urgent:
+RED
+
+Do not put bright green borders around everything.
+
+Bottom Navigation
+
+There must still be exactly four destinations:
+
+HOME
+PLAN
+EXECUTE
+SETTINGS
+
+Inactive:
+gray
+
+Active:
+CYAN
+
+Active item gets a subtle rounded cyan-tinted capsule/pill.
+
+Keep the floating navigation design already specified:
+
+- rounded floating surface
+- separated from screen edges
+- subtle elevation
+- Telegram-like alignment
+- modern rounded icons
+- icon and label centered
+- smooth 150–250ms transitions
+- hide when scrolling down
+- reappear when scrolling up
+- Compose LazyColumn compatible
+
+Buttons
+
+Primary interactive buttons:
+CYAN
+
+Successful action:
+GREEN
+
+Destructive action:
+RED
+
+Warning action:
+AMBER
+
+Secondary action:
+neutral dark/gray
+
+Do not make every button green.
+
+Progress
+
+Normal study completion:
+GREEN
+
+Exam preparation:
+PURPLE
+
+Information/progress context:
+BLUE when appropriate
+
+Urgency:
+AMBER or RED depending on state
+
+Exam countdown
+
+The countdown should visually communicate urgency.
+
+More than 20 days:
+normal/blue or neutral
+
+20–16 days:
+AMBER
+
+16 days and below:
+RED according to urgency rules
+
+Do not make the entire screen red.
+
+Urgent Plan
+
+Urgent Plan uses RED because it represents an exam entering the urgent planning window.
+
+Use:
+
+- red status indicator
+- red label
+- subtle red glow/pulse if appropriate
+
+Keep the card itself dark.
+
+Exam Preparation
+
+Use PURPLE as its primary semantic identity because it represents intelligent preparation/analysis.
+
+Analytics / Reports
+
+Use PURPLE as the main analytical accent.
+
+Graphs should remain readable and restrained.
+
+Do not use random colors for every data point unless the colors communicate different categories.
+
+Serious Mode
+
+Serious Mode uses subtle RED semantic treatment.
+
+Do NOT turn the whole application red.
+
+Use:
+
+- subtle red status indicator
+- very subtle red ambient effect
+- stronger focus
+- reduced visual distractions
+- restrained animation
+
+AI
+
+VOID AI uses PURPLE + CYAN.
+
+PURPLE:
+AI/intelligence identity
+
+CYAN:
+interaction/actions/user controls
+
+AI must feel integrated into VOID, not like a completely separate chatbot app.
+
+3. IMPORTANT D-CLASS CORRECTION
+
+Previous interpretations of D-Class were incorrect.
+
+The correct meaning is:
+
+D-CLASS = AFTERNOON SCHOOL SLOT
+
+D-Class is NOT a separate academic subject/category.
+
+D-Class means that the user has an afternoon school session.
+
+The actual activity inside D-Class can be:
+
+- LANGUAGE
+- LAB
+
+Therefore:
+
+D-Class
+↓
+Afternoon school session
+↓
+Language OR Lab
+
+Do NOT create separate "D-Class" academic logic that treats it as another subject.
+
+D-Class scheduling rules
+
+D-Class can occur on ANY school day.
+
+Normal school days:
+Monday–Friday.
+
+D-Class can occur on any of those days.
+
+Maximum:
+2 D-Class days per week.
+
+The remaining school-day afternoons must remain available for study/planning.
+
+Example only:
+
+Monday → D-Class: Language
+Tuesday → Study available
+Wednesday → D-Class: Lab
+Thursday → Study available
+Friday → Study available
+
+This example must NOT be hard-coded.
+
+The user must register/configure their actual D-Class schedule.
+
+D-Class registration
+
+Create appropriate UI under:
+
+SETTINGS
+→ SCHEDULE
+→ TIMETABLE / CLASSES
+→ Register Class
+
+The user should be able to specify:
+
+Day
+Activity
+Start time
+End time
+Class type
+
+For afternoon school:
+
+Class type/activity:
+LANGUAGE
+or
+LAB
+
+The system may internally recognize these as D-Class afternoon events if useful, but the UI and database must preserve the actual activity.
+
+Do NOT assume:
+
+- fixed D-Class days
+- fixed D-Class times
+- fixed Language day
+- fixed Lab day
+- 2 days every week
+- a specific afternoon duration
+
+All must come from user data.
+
+Planner behavior
+
+The planning engine must calculate:
+
+School afternoon occupied by D-Class
++
+Available afternoon study time
++
+Configured night-study availability
+
+Therefore, if the user has D-Class on only one day, the other afternoons remain available.
+
+If the user has two D-Class days, the other three school-day afternoons can potentially be used for study.
+
+Never hard-code a three-hour afternoon study period.
+
+4. NEW FEATURE — VOID AI CHAT
+
+Add a dedicated AI Chat page to the same VOID application.
+
+This is NOT a fake demonstration chatbot.
+
+It must use a real API integration.
+
+The UI may be simple, but the architecture must be real and extensible.
+
+The AI should be able to understand relevant information from the VOID application and provide useful academic planning assistance.
+
+AI Chat purpose
+
+The user should be able to talk naturally to VOID.
+
+Examples of user requests:
+
+"What should I study tonight?"
+
+"I only have two hours today. Make the best plan."
+
+"What am I behind on?"
+
+"Why did you schedule Physics before Mathematics?"
+
+"I have an exam coming soon. What should I focus on?"
+
+"Move this task to tomorrow."
+
+"How am I doing this week?"
+
+"Which subjects need the most attention?"
+
+"Explain my current plan."
+
+These are examples of behavior, NOT hard-coded commands.
+
+The AI should work with arbitrary natural-language user input.
+
+5. AI CHAT UI
+
+Create a dedicated Chat screen.
+
+It should feel like a modern AI assistant but still belong to VOID.
+
+Suggested structure:
+
+TOP BAR
+
+VOID AI
+Status / context indicator
+Optional settings/action icon
+
+CHAT AREA
+
+Scrollable conversation.
+
+AI messages:
+dark surface
+subtle purple identity indicator
+
+User messages:
+slightly elevated dark surface
+subtle cyan identity/interaction treatment
+
+Bottom input area:
+
+┌──────────────────────────────┐
+│ Ask VOID anything...      ➤  │
+└──────────────────────────────┘
+
+Requirements:
+
+- multiline text input
+- send button
+- keyboard-safe layout
+- automatic scroll to latest message
+- smooth message appearance
+- loading/thinking state
+- error state
+- retry
+- long-response scrolling
+- preserve conversation while the screen is open
+- clear conversation option
+- accessible text contrast
+- no excessive animations
+
+Do not use a fake prewritten conversation as the primary UI.
+
+6. AI CHAT UX
+
+The user should immediately understand:
+
+"I can tell VOID what I need, and VOID can understand my academic situation."
+
+When the AI is processing:
+
+show a subtle state such as:
+
+Thinking...
+
+Do not create a ridiculous animated hacker effect.
+
+If the API fails:
+
+show a useful error and Retry option.
+
+Example:
+
+AI unavailable.
+
+Check your API configuration or connection.
+
+[ RETRY ]
+
+Do not crash the application.
+
+7. USER INPUT MUST BE REAL
+
+The Chat UI must accept actual user text.
+
+Do NOT hard-code:
+
+"What should I study tonight?"
+
+as the only supported input.
+
+Do NOT create a switch statement such as:
+
+if message == "what should I study tonight"
+return hardcoded answer
+
+The user can type anything.
+
+The input must be sent through the AI/API layer.
+
+8. API CONFIGURATION
+
+The AI provider/API must NOT be hard-coded into the chat UI.
+
+Create an AI configuration layer.
+
+Architecture should conceptually be:
+
+Chat UI
+↓
+AI ViewModel / Controller
+↓
+AI Repository / Service
+↓
+API Client
+↓
+AI Provider
+
+The UI must not directly contain API networking logic.
+
+API configuration must be user-configurable
+
+Create an appropriate configuration screen, likely under:
+
+SETTINGS
+→ INTEGRATIONS
+→ AI
+
+The exact provider should remain configurable rather than permanently assuming one provider.
+
+The user should be able to enter/configure:
+
+- API provider
+- API key
+- model
+- optional API endpoint/base URL where supported
+- other necessary configuration
+
+Do NOT put a real API key into source code.
+
+Do NOT hard-code secrets.
+
+Do NOT commit API keys into Git.
+
+Mask sensitive credentials in the UI.
+
+Allow:
+
+- save
+- replace
+- remove
+- test connection
+
+Show connection status without exposing the secret.
+
+9. AI DATA ACCESS
+
+The AI must be connected to the actual VOID application data.
+
+The AI should be able to receive relevant context from:
+
+ACADEMIC
+
+- subjects
+- units
+- assessments
+- marks
+- progress/performance
+
+SCHEDULE
+
+- timetable
+- classes
+- D-Class afternoon sessions
+- available afternoons
+- night-study availability
+- calendar
+
+EXAMS
+
+- exam schedule
+- exam type
+- exam date/time
+- subjects
+- selected units
+- selected grades for mock exams
+- exam preparation status
+
+PLANNING
+
+- Circle Plans
+- Temporary Plans
+- automatic Urgent Plans
+- Today’s Plan
+- conflicts
+- priorities
+
+EXECUTION
+
+- study sessions
+- completed work
+- partial work
+- missed work
+
+REPORTING
+
+- relevant calculated progress
+- trends
+- completion statistics
+
+The AI must not invent database information.
+
+If information is unavailable, it should say so.
+
+10. AI CONTEXT ARCHITECTURE
+
+Do not simply dump the entire SQLite database into every API request.
+
+Create a controlled context layer.
+
+Conceptually:
+
+VOID DATABASE
+↓
+Context Builder
+↓
+Relevant academic/planning context
+↓
+AI Service
+↓
+API
+
+The Context Builder should construct only the information needed for the current request where possible.
+
+For example:
+
+User:
+"What should I study tonight?"
+
+Context may include:
+
+- today's schedule
+- today's available time
+- tonight's availability
+- today's tasks
+- exam urgency
+- missed tasks
+- Circle Plans
+- Temporary Plans
+- Exam Preparation
+- current progress
+
+Then the AI produces a recommendation based on that actual context.
+
+11. AI MUST NOT REPLACE THE PLANNING ENGINE
+
+This is extremely important.
+
+The AI is an assistant.
+
+The Planning Engine remains responsible for deterministic scheduling and conflict resolution.
+
+Architecture:
+
+USER
+↓
+AI CHAT
+↓
+UNDERSTAND REQUEST
+↓
+PLANNING / DATA SERVICES
+↓
+PLANNING ENGINE
+↓
+RESULT
+↓
+AI EXPLANATION
+↓
+USER
+
+Do not allow the AI to randomly invent a schedule independently of the planning engine.
+
+For example, if the user asks:
+
+"I only have two hours tonight. What should I study?"
+
+The AI should obtain the real available capacity and relevant tasks, then use the planning logic to determine a sensible recommendation.
+
+12. AI ACTIONS
+
+The AI may eventually recommend actions such as:
+
+- create a temporary plan
+- move a task
+- adjust a plan
+- prioritize an exam
+- explain a conflict
+- summarize progress
+
+But actions that modify important application data should NOT happen silently.
+
+Use confirmation.
+
+Example:
+
+VOID AI recommends:
+
+Move Mathematics from 20:00 to 21:00.
+
+[ APPLY ]
+[ CANCEL ]
+
+Only after APPLY should the application modify the database.
+
+The AI should never silently delete or radically modify important academic data.
+
+13. AI CHAT HISTORY
+
+Design the architecture so chat history can be persisted.
+
+Possible structure:
+
+chat_conversations
+chat_messages
+
+At minimum store:
+
+conversation ID
+message ID
+role
+content
+timestamp
+
+Do not store API keys inside chat history.
+
+Allow the user to clear chat history.
+
+14. AI SECURITY
+
+Sensitive information must be protected.
+
+Never:
+
+- hard-code API keys
+- print API keys in logs
+- display full API keys
+- include secrets in reports
+- send unrelated sensitive database information to the AI
+
+Only send the minimum relevant context required for the user's request.
+
+15. TELEGRAM BACKUP + FULL DATABASE RECOVERY
+
+The Telegram integration must also be expanded.
+
+The user wants the database to survive app deletion/reinstallation through Telegram backup.
+
+Important Android behavior:
+
+When the app is uninstalled, its private local database can be removed.
+
+Therefore Telegram must provide an external backup mechanism.
+
+Telegram page
+
+Settings
+→ Integrations
+→ Telegram
+
+Should include:
+
+Telegram Status
+
+Bot Token
+Chat ID
+
+[ Test Connection ]
+
+BACKUP
+
+[ Backup Database to Telegram ]
+
+RESTORE
+
+[ Find / Restore Database ]
+
+Report Delivery settings remain separate.
+
+Backup
+
+The backup system must export the complete required VOID application database/state.
+
+It must include all important user data necessary to reconstruct the application, including relevant:
+
+- subjects
+- units
+- assessments
+- timetable
+- availability
+- exams
+- exam subjects
+- exam units
+- exam grades
+- Circle Plans
+- Temporary Plans
+- generated planning state where appropriate
+- plan tasks
+- execution/session history
+- progress
+- settings that are safe and necessary to restore
+
+Do NOT back up the API key or Telegram bot token as plain data.
+
+A database backup should be versioned so future database schema changes can be handled.
+
+Example conceptual format:
+
+VOID_BACKUP
+version
+created_at
+database data
+
+The actual implementation can use a secure structured backup/archive format.
+
+16. RESTORE AFTER REINSTALL
+
+Expected user flow:
+
+USER INSTALLS VOID AGAIN
+↓
+opens Telegram configuration
+↓
+enters Bot Token
+↓
+enters Chat ID
+↓
+Test Connection
+↓
+Restore / Recovery
+↓
+VOID finds the backup
+↓
+user confirms restore
+↓
+database is restored
+↓
+application reloads data
+↓
+Home/Plan/Execute show restored state
+
+The user should NOT have to manually rebuild all subjects, exams, plans, etc.
+
+Recovery UI
+
+Show something like:
+
+DATABASE RECOVERY
+
+Telegram connected
+
+Backup found:
+VOID Backup
+Created:
+[date/time]
+
+[ RESTORE DATABASE ]
+
+After selection:
+
+Restore this backup?
+
+This will replace current local application data.
+
+[ CANCEL ]
+[ RESTORE ]
+
+After successful restoration:
+
+✓ DATABASE RESTORED
+
+Restart/reload application state as required.
+
+17. BACKUP SECURITY
+
+Do not assume Telegram storage alone is enough security.
+
+If feasible, encrypt the database backup before uploading it.
+
+The implementation should consider:
+
+- encryption
+- backup integrity verification
+- backup version
+- corruption detection
+- restore validation
+- safe temporary files
+- deletion of temporary decrypted files after use
+
+If a backup is encrypted, design a proper user-controlled recovery secret/password mechanism rather than silently storing an encryption key in the backup itself.
+
+Do NOT send raw sensitive database contents unnecessarily.
+
+18. DO NOT DESTROY CURRENT USER DATA DURING RESTORE
+
+Restore must be deliberate.
+
+Before replacing current database:
+
+- validate backup
+- verify version
+- verify integrity
+- confirm with user
+- optionally create a temporary safety backup of the current database if practical
+
+Never overwrite the database immediately just because the user opened the recovery page.
+
+19. ARCHITECTURE
+
+The project should remain logically separated:
+
+VOID
+├── UI
+│   ├── Home
+│   ├── Plan
+│   ├── Execute
+│   ├── Settings
+│   └── AI Chat
+│
+├── BUSINESS LOGIC
+│   ├── Planning Engine
+│   ├── Score Engine
+│   ├── Exam Preparation Engine
+│   ├── Urgent Plan Logic
+│   └── AI Context/Action Layer
+│
+├── DATA
+│   ├── Repository
+│   ├── SQLite/Room Database
+│   ├── Backup/Restore
+│   └── Telegram Integration
+│
+└── NETWORK
+└── AI API Service
+
+Do not put networking, database operations, or planning logic directly inside composable UI functions.
+
+20. FINAL IMPLEMENTATION RULE
+
+Everything must remain data-driven.
+
+Never hard-code:
+
+- subjects
+- units
+- exam dates
+- exam subjects
+- D-Class days
+- D-Class times
+- Language days
+- Lab days
+- night-study hours
+- Circle Plans
+- Temporary Plans
+- AI responses
+- user's academic information
+
+Examples in this specification are only examples.
+
+The actual application must use:
+
+USER INPUT
++
+DATABASE
++
+PLANNING ENGINE
++
+SCORE ENGINE
++
+EXAM PREPARATION ENGINE
++
+AI SERVICE
+
+to produce the actual application state.
+
+Before implementing, inspect the existing VOID architecture and integrate these features into the current project rather than creating disconnected duplicate systems.
+
+Do not remove existing functionality that already works.
+
+Do not create a second app.
+
+Do not rename the project.
+
+The project remains VOID.

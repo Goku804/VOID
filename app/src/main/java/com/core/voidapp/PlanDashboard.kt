@@ -77,8 +77,8 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PlanNavCard("CIRCLE PLAN", "${VoidRepository.circlePlans.size} slots", Modifier.weight(1f)) { onOpen(PlanSection.CIRCLE) }
-                PlanNavCard("TEMPORARY PLAN", "${VoidRepository.activeTemporaryTasks().size} active", Modifier.weight(1f)) { onOpen(PlanSection.TEMPORARY) }
+                PlanNavCard("CIRCLE PLAN", "${VoidRepository.circlePlans.size} slots", Modifier.weight(1f), identityColor = VoidColors.Cyan) { onOpen(PlanSection.CIRCLE) }
+                PlanNavCard("TEMPORARY PLAN", "${VoidRepository.activeTemporaryTasks().size} active", Modifier.weight(1f), identityColor = VoidColors.Info) { onOpen(PlanSection.TEMPORARY) }
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -96,7 +96,8 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
                 title = "EXAM PREPARATION",
                 subtitle = "Coming in v0.11.0 \u2014 needs the Priority Engine",
                 modifier = Modifier.fillMaxWidth(),
-                soon = true
+                soon = true,
+                identityColor = VoidColors.Purple
             ) { onOpen(PlanSection.EXAM_PREP) }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -112,8 +113,8 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
 
 @Composable
 private fun UrgentPlanBanner(urgentSubjects: List<com.core.voidapp.data.ExamSubject>) {
-    GlowCard(glowColor = VoidColors.Warning) {
-        Text("URGENT PLAN \u2014 ACTIVE", color = VoidColors.Warning, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+    GlowCard(glowColor = VoidColors.Danger) {
+        Text("URGENT PLAN \u2014 ACTIVE", color = VoidColors.Danger, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Automatically triggered \u2014 a Mid/Final/Mock exam is 16-20 days out.",
@@ -132,7 +133,7 @@ private fun UrgentPlanBanner(urgentSubjects: List<com.core.voidapp.data.ExamSubj
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.weight(1f)
                 )
-                Text("${es.daysRemaining()}d", color = VoidColors.Warning, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("${es.daysRemaining()}d", color = VoidColors.Danger, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
@@ -196,9 +197,13 @@ private fun StatusLine(color: androidx.compose.ui.graphics.Color, text: String) 
 }
 
 @Composable
-private fun PlanNavCard(title: String, subtitle: String, modifier: Modifier = Modifier, soon: Boolean = false, onClick: () -> Unit) {
+private fun PlanNavCard(title: String, subtitle: String, modifier: Modifier = Modifier, soon: Boolean = false, identityColor: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
     VoidCard(modifier = modifier.clickable { onClick() }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (identityColor != null) {
+                StatusDot(identityColor, Modifier.width(7.dp).height(7.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = VoidColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 Text(subtitle, color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace)

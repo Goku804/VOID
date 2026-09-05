@@ -219,8 +219,8 @@ private fun TemporaryTaskRow(task: TemporaryTask) {
         if (expanded) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TSmallButton("+15 MIN", VoidColors.Accent) { VoidRepository.addProgress(task.id, 15) }
-                TSmallButton("+30 MIN", VoidColors.Accent) { VoidRepository.addProgress(task.id, 30) }
+                TSmallButton("+15 MIN", VoidColors.Cyan) { VoidRepository.addProgress(task.id, 15) }
+                TSmallButton("+30 MIN", VoidColors.Cyan) { VoidRepository.addProgress(task.id, 30) }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -381,12 +381,12 @@ private fun TBigButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(VoidColors.Accent.copy(alpha = 0.12f))
-            .border(1.dp, VoidColors.Accent, RoundedCornerShape(8.dp))
+            .background(VoidColors.Cyan.copy(alpha = 0.12f))
+            .border(1.dp, VoidColors.Cyan, RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vertical = 12.dp)
     ) {
-        Text(text, color = VoidColors.Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text(text, color = VoidColors.Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
     }
 }
 

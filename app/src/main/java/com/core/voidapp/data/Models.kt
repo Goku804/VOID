@@ -23,9 +23,16 @@ enum class ExamType {
     MID, FINAL, MOCK
 }
 
+/**
+ * D-Class is NOT a class type — it just means "an afternoon school session
+ * exists that day". The actual registered type is always LANGUAGE or LAB.
+ */
 enum class ClassType {
-    REGULAR, D_CLASS, LANGUAGE, LAB, LIBRARY, STUDY, NIGHT_STUDY, EXAM
+    REGULAR, LANGUAGE, LAB, LIBRARY, STUDY, NIGHT_STUDY, EXAM
 }
+
+/** True if this period is a D-Class-style afternoon session (Language or Lab). */
+fun ClassPeriod.isDClassSession(): Boolean = classType == ClassType.LANGUAGE || classType == ClassType.LAB
 
 /** Subject code, e.g. "MATH" — short label used in dense timetable views. */
 data class Subject(

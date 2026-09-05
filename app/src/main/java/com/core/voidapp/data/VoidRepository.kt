@@ -167,6 +167,9 @@ object VoidRepository {
     fun scheduleFor(day: DayOfWeekVoid): List<ClassPeriod> =
         classPeriods.filter { it.day == day }.sortedBy { it.periodNumber }
 
+    /** Distinct days that already have a D-Class-style afternoon session (Language/Lab). Soft max is 2/week — user-configured, never assumed. */
+    fun dClassDayCount(): Int = classPeriods.filter { it.isDClassSession() }.map { it.day }.distinct().size
+
     /** Current setting for a day, or a sensible "not configured" default if never set. */
     fun nightAvailabilityFor(day: DayOfWeekVoid): NightAvailability =
         nightAvailability.find { it.day == day } ?: NightAvailability(day = day, available = false)

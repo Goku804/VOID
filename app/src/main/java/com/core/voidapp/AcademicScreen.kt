@@ -525,14 +525,14 @@ private fun ABigButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(AAccent.copy(alpha = 0.12f))
-            .border(1.dp, AAccent, RoundedCornerShape(8.dp))
+            .background(VoidColors.Cyan.copy(alpha = 0.12f))
+            .border(1.dp, VoidColors.Cyan, RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vertical = 12.dp)
     ) {
         Text(
             text = text,
-            color = AAccent,
+            color = VoidColors.Cyan,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
@@ -547,11 +547,11 @@ private fun ASmallButton(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(AAccent.copy(alpha = 0.15f))
-            .border(1.dp, AAccent, RoundedCornerShape(6.dp))
+            .background(VoidColors.Cyan.copy(alpha = 0.15f))
+            .border(1.dp, VoidColors.Cyan, RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Text(text, color = AAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        Text(text, color = VoidColors.Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
     }
 }

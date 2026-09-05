@@ -38,7 +38,7 @@ import com.core.voidapp.data.label
 import com.core.voidapp.data.status
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.10.1"
+const val APP_VERSION = "VOID v0.10.2"
 
 class MainActivity : ComponentActivity() {
 
@@ -289,7 +289,7 @@ fun NearestExamCountdown() {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = status.label(examSubject.daysRemaining()),
-                color = if (examSubject.isUrgent()) VoidColors.Warning else VoidColors.Accent,
+                color = examCountdownColor(status, examSubject.daysRemaining()),
                 fontSize = 18.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold

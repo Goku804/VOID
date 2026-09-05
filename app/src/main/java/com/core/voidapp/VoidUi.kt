@@ -95,3 +95,18 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier) {
             .background(color)
     )
 }
+
+/**
+ * Exam countdown urgency color, per spec: >20 days neutral/blue, 20-16
+ * amber, below 16 red. Today/Started/Completed get their own treatment.
+ */
+fun examCountdownColor(status: com.core.voidapp.data.ExamSittingStatus, daysRemaining: Long): Color = when (status) {
+    com.core.voidapp.data.ExamSittingStatus.COMPLETED -> VoidColors.TextSecondary
+    com.core.voidapp.data.ExamSittingStatus.STARTED,
+    com.core.voidapp.data.ExamSittingStatus.TODAY -> VoidColors.Danger
+    com.core.voidapp.data.ExamSittingStatus.UPCOMING -> when {
+        daysRemaining > 20 -> VoidColors.Info
+        daysRemaining >= 16 -> VoidColors.Warning
+        else -> VoidColors.Danger
+    }
+}
