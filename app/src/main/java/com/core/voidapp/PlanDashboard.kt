@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.PlanTaskStatus
 import com.core.voidapp.data.VoidRepository
+import com.core.voidapp.data.daysRemaining
 import com.core.voidapp.data.isOverdue
 
 private enum class PlanSection(val title: String) {
@@ -83,6 +84,14 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
         }
 
         item {
+            val urgent = VoidRepository.urgentExamSubjects()
+            if (urgent.isNotEmpty()) {
+                UrgentPlanBanner(urgent)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        item {
             PlanNavCard(
                 title = "EXAM PREPARATION",
                 subtitle = "Coming in v0.11.0 \u2014 needs the Priority Engine",
@@ -98,6 +107,41 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
             PlanningStatusCard()
             Spacer(modifier = Modifier.height(90.dp))
         }
+    }
+}
+
+@Composable
+private fun UrgentPlanBanner(urgentSubjects: List<com.core.voidapp.data.ExamSubject>) {
+    GlowCard(glowColor = VoidColors.Warning) {
+        Text("URGENT PLAN \u2014 ACTIVE", color = VoidColors.Warning, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Automatically triggered \u2014 a Mid/Final/Mock exam is 16-20 days out.",
+            color = VoidColors.TextSecondary,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        urgentSubjects.forEach { es ->
+            val exam = VoidRepository.examFor(es)
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                Text(
+                    text = "${exam?.examType?.name ?: ""} \u00b7 ${VoidRepository.subjectName(es.subjectId)}",
+                    color = VoidColors.TextPrimary,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("${es.daysRemaining()}d", color = VoidColors.Warning, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Full auto-generated Exam Preparation needs the Priority Engine (v0.11.0) \u2014 for now this is a detection signal only.",
+            color = VoidColors.TextSecondary,
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }
 

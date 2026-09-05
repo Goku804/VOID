@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".VoidApplication"
         android:allowBackup="true"
         android:label="VOID"
         android:supportsRtl="true"

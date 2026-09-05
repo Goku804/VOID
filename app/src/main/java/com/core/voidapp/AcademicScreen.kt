@@ -43,15 +43,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.AcademicUnit
+import com.core.voidapp.data.AssessmentKind
 import com.core.voidapp.data.AssessmentType
-import com.core.voidapp.data.Exam
-import com.core.voidapp.data.ExamType
 import com.core.voidapp.data.Subject
 import com.core.voidapp.data.VoidRepository
-import com.core.voidapp.data.countdown
 import com.core.voidapp.data.totalWeight
 import com.core.voidapp.data.weightedTotal
-import java.time.LocalDate
 
 private val ABlack = Color(0xFF050505)
 private val APanel = Color(0xFF0D0D0D)
@@ -62,7 +59,7 @@ private val AMuted = Color(0xFF888888)
 private val AAccent = Color(0xFF00E676)
 private val AWarn = Color(0xFFFF3D3D)
 
-private enum class AcademicTab { SUBJECTS, UNITS, MARKS, EXAMS }
+private enum class AcademicTab { SUBJECTS, UNITS, MARKS }
 
 @Composable
 fun AcademicScreenReal() {
@@ -76,7 +73,7 @@ fun AcademicScreenReal() {
     ) {
         Text("VOID", color = AAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
         Text("ACADEMIC", color = AText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Text("SUBJECTS \u2022 UNITS \u2022 MARKS \u2022 EXAMS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text("SUBJECTS \u2022 UNITS \u2022 MARKS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -84,7 +81,6 @@ fun AcademicScreenReal() {
             ATab("SUBJ", tab == AcademicTab.SUBJECTS, Modifier.weight(1f)) { tab = AcademicTab.SUBJECTS }
             ATab("UNITS", tab == AcademicTab.UNITS, Modifier.weight(1f)) { tab = AcademicTab.UNITS }
             ATab("MARKS", tab == AcademicTab.MARKS, Modifier.weight(1f)) { tab = AcademicTab.MARKS }
-            ATab("EXAMS", tab == AcademicTab.EXAMS, Modifier.weight(1f)) { tab = AcademicTab.EXAMS }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -93,7 +89,6 @@ fun AcademicScreenReal() {
             AcademicTab.SUBJECTS -> SubjectsTab()
             AcademicTab.UNITS -> UnitsTab()
             AcademicTab.MARKS -> MarksSection()
-            AcademicTab.EXAMS -> ExamsSection()
         }
     }
 }
@@ -340,7 +335,7 @@ private fun SubjectMarksCard(subject: Subject) {
 @Composable
 private fun AddAssessmentInline(subject: Subject) {
     var expanded by remember { mutableStateOf(false) }
-    var examType by remember { mutableStateOf(ExamType.TEST) }
+    var kind by remember { mutableStateOf(AssessmentKind.TEST) }
     var label by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
     var maxScore by remember { mutableStateOf("") }
@@ -356,9 +351,9 @@ private fun AddAssessmentInline(subject: Subject) {
 
     if (expanded) {
         Spacer(modifier = Modifier.height(8.dp))
-        AExamTypeDropdown(selected = examType, onSelected = { examType = it })
+        AAssessmentKindDropdown(selected = kind, onSelected = { kind = it })
         Spacer(modifier = Modifier.height(6.dp))
-        AField(value = label, onValueChange = { label = it }, label = "Label (e.g. Mid Exam)")
+        AField(value = label, onValueChange = { label = it }, label = "Label (e.g. Chapter 3 Test)")
         Spacer(modifier = Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AField(value = weight, onValueChange = { weight = it }, label = "Weight %", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
@@ -369,7 +364,7 @@ private fun AddAssessmentInline(subject: Subject) {
             val w = weight.toDoubleOrNull()
             val m = maxScore.toDoubleOrNull()
             if (label.isNotBlank() && w != null && m != null) {
-                VoidRepository.addAssessmentType(subject.id, examType, label.trim(), w, m)
+                VoidRepository.addAssessmentType(subject.id, kind, label.trim(), w, m)
                 label = ""; weight = ""; maxScore = ""; expanded = false
             }
         }
@@ -415,107 +410,6 @@ private fun MarkEntryRow(subject: Subject, type: AssessmentType) {
 }
 
 // ---------------------------------------------------------------------
-// EXAMS
-// ---------------------------------------------------------------------
-
-@Composable
-private fun ExamsSection() {
-    var subjectId by remember { mutableStateOf<String?>(null) }
-    var examType by remember { mutableStateOf(ExamType.MID) }
-    var title by remember { mutableStateOf("") }
-    var dateText by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-
-        item {
-            APanelCard {
-                Text("ADD EXAM", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (VoidRepository.subjects.isEmpty()) {
-                    Text("Add a subject in the SUBJ tab first.", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                } else {
-                    ASubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it })
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AExamTypeDropdown(selected = examType, onSelected = { examType = it })
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AField(value = title, onValueChange = { title = it }, label = "Title (e.g. Unit 3 Mid)")
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AField(value = dateText, onValueChange = { dateText = it }, label = "Date (YYYY-MM-DD)")
-
-                    if (error != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(error!!, color = AWarn, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    ABigButton("+ ADD EXAM") {
-                        val sid = subjectId
-                        if (sid == null) {
-                            error = "Select a subject"
-                        } else if (title.isBlank()) {
-                            error = "Enter a title"
-                        } else {
-                            try {
-                                val date = LocalDate.parse(dateText.trim())
-                                VoidRepository.addExam(sid, examType, title.trim(), date)
-                                title = ""; dateText = ""; error = null
-                            } catch (e: Exception) {
-                                error = "Date must be YYYY-MM-DD"
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            Text("UPCOMING EXAMS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        val upcoming = VoidRepository.upcomingExams()
-        if (upcoming.isEmpty()) {
-            item { Text("No upcoming exams.", color = AMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
-        }
-
-        items(upcoming) { exam ->
-            ExamRow(exam)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        item { Spacer(modifier = Modifier.height(90.dp)) }
-    }
-}
-
-@Composable
-private fun ExamRow(exam: Exam) {
-    val cd = exam.countdown()
-    APanelCard {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(exam.title, color = AText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "${VoidRepository.subjectName(exam.subjectId)} \u00b7 ${exam.type.name}",
-                    color = AMuted,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-            Text(
-                text = if (cd.totalDays == 0L) "TODAY" else "${cd.totalDays}d",
-                color = AAccent,
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------
 // SHARED DROPDOWNS
 // ---------------------------------------------------------------------
 
@@ -550,7 +444,7 @@ private fun ASubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AExamTypeDropdown(selected: ExamType, onSelected: (ExamType) -> Unit) {
+private fun AAssessmentKindDropdown(selected: AssessmentKind, onSelected: (AssessmentKind) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         Row(
@@ -562,12 +456,12 @@ private fun AExamTypeDropdown(selected: ExamType, onSelected: (ExamType) -> Unit
                 .padding(horizontal = 12.dp, vertical = 10.dp)
                 .fillMaxWidth()
         ) {
-            Text(selected.name, color = AText, fontSize = 12.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            Text(selected.name.replace('_', ' '), color = AText, fontSize = 12.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AMuted)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            ExamType.entries.forEach { type ->
-                DropdownMenuItem(text = { Text(type.name) }, onClick = { onSelected(type); open = false })
+            AssessmentKind.entries.forEach { kind ->
+                DropdownMenuItem(text = { Text(kind.name.replace('_', ' ')) }, onClick = { onSelected(kind); open = false })
             }
         }
     }

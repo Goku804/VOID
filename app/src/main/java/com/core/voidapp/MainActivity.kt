@@ -32,10 +32,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.core.voidapp.data.countdown
+import com.core.voidapp.data.daysRemaining
+import com.core.voidapp.data.isUrgent
+import com.core.voidapp.data.label
+import com.core.voidapp.data.status
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.9.0"
+const val APP_VERSION = "VOID v0.10.0"
 
 class MainActivity : ComponentActivity() {
 
@@ -252,10 +255,10 @@ fun todayAsVoidDay(): com.core.voidapp.data.DayOfWeekVoid {
     return com.core.voidapp.data.DayOfWeekVoid.valueOf(d.name)
 }
 
-/** Live countdown card to the nearest upcoming exam — reads real device time. */
+/** Live countdown card to the nearest upcoming exam sitting — reads real device time. */
 @Composable
 fun NearestExamCountdown() {
-    val exam = com.core.voidapp.data.VoidRepository.nearestExam()
+    val examSubject = com.core.voidapp.data.VoidRepository.nearestExamSubject()
 
     GlowCard {
         Text(
@@ -267,30 +270,26 @@ fun NearestExamCountdown() {
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        if (exam == null) {
+        if (examSubject == null) {
             Text(
-                text = "No exams scheduled. Add one in SETTINGS \u2192 ACADEMIC.",
+                text = "No exams scheduled. Add one in SETTINGS \u2192 EXAMS.",
                 color = VoidColors.TextPrimary,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace
             )
         } else {
-            val cd = exam.countdown()
+            val exam = com.core.voidapp.data.VoidRepository.examFor(examSubject)
+            val status = examSubject.status()
             Text(
-                text = "${exam.title} \u00b7 ${com.core.voidapp.data.VoidRepository.subjectName(exam.subjectId)}",
+                text = "${exam?.examType?.name ?: ""} \u00b7 ${com.core.voidapp.data.VoidRepository.subjectName(examSubject.subjectId)}",
                 color = VoidColors.TextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = buildString {
-                    if (cd.years > 0) append("${cd.years}y ")
-                    if (cd.months > 0 || cd.years > 0) append("${cd.months}m ")
-                    append("${cd.days}d")
-                    append("  (${cd.totalDays} days total)")
-                },
-                color = VoidColors.Accent,
+                text = status.label(examSubject.daysRemaining()),
+                color = if (examSubject.isUrgent()) VoidColors.Warning else VoidColors.Accent,
                 fontSize = 18.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold

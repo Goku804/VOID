@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 private enum class SettingsSection(val title: String, val subtitle: String, val ready: Boolean) {
     ACADEMIC("ACADEMIC", "Subjects \u00b7 Marks \u00b7 Exams", true),
     SCHEDULE("SCHEDULE", "Timetable \u00b7 Classes \u00b7 Calendar", true),
-    EXAMS("EXAMS", "Exam Schedule \u00b7 Preparation", false),
+    EXAMS("EXAMS", "Exam Schedule", true),
     PLANNING("PLANNING", "Circle Plans \u00b7 Temporary Plans", false),
     REPORTS("REPORTS", "Daily \u00b7 Weekly \u00b7 Monthly", false),
     INTEGRATIONS("INTEGRATIONS", "Telegram", false),
@@ -64,6 +64,9 @@ fun SettingsScreen() {
         }
         SettingsSection.SCHEDULE -> SettingsSubScreen(section.title, onBack = { open = null }) {
             SetupScreen()
+        }
+        SettingsSection.EXAMS -> SettingsSubScreen(section.title, onBack = { open = null }) {
+            ExamScheduleScreen()
         }
         SettingsSection.ABOUT -> SettingsSubScreen(section.title, onBack = { open = null }) {
             AboutContent()

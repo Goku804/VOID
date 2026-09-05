@@ -13,8 +13,14 @@ enum class DayOfWeekVoid {
     MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
 }
 
+/** Assessment type — for things already graded (a Test, an Assignment, etc). NOT the same as ExamType (Exam Schedule). */
+enum class AssessmentKind {
+    TEST, ASSIGNMENT, MID_EXAM, FINAL_EXAM, MOCK_EXAM, QUIZ, OTHER
+}
+
+/** Exam Schedule type — a real upcoming exam event. NOT the same as AssessmentKind. */
 enum class ExamType {
-    TEST, ASSIGNMENT, MID, FINAL, MOCK
+    MID, FINAL, MOCK
 }
 
 enum class ClassType {
@@ -33,11 +39,12 @@ data class Subject(
 /**
  * One graded component inside a subject (e.g. "Mid" worth 20%).
  * weightPercent is user-defined per subject — not shared globally.
+ * This is an already-taken assessment, distinct from the Exam Schedule below.
  */
 data class AssessmentType(
     val id: String,
-    val examType: ExamType,
-    val label: String,       // display name, e.g. "Mid Exam"
+    val kind: AssessmentKind,
+    val label: String,       // display name, e.g. "Chapter 3 Test"
     val weightPercent: Double,
     val maxScore: Double,
     var entry: MarkEntry? = null
@@ -123,16 +130,67 @@ data class NightAvailability(
     val end: LocalTime? = null
 )
 
+enum class ExamSession { MORNING, AFTERNOON, EVENING, CUSTOM }
+
 /**
- * An exam/test event with a real date, used to drive the live countdown.
+ * The exam event itself: what type of exam this is. Deliberately thin —
+ * everything date/time/subject-specific lives on ExamSubject, since one
+ * exam period can cover several subjects, each at its own time.
  */
 data class Exam(
     val id: String,
-    val subjectId: String,
-    val type: ExamType,
-    val title: String,
-    val date: LocalDate
+    val examType: ExamType,
+    val notes: String = ""
 )
+
+/**
+ * One subject's sitting within an exam — its own date/time/session/units.
+ * "Mathematics Final, Monday 08:30" and "Physics Final, Monday 14:00" are
+ * two ExamSubject rows under the same Final Exam.
+ * grades is only meaningful when the parent Exam.examType == MOCK.
+ */
+data class ExamSubject(
+    val id: String,
+    val examId: String,
+    val subjectId: String,
+    val date: LocalDate,
+    val time: LocalTime? = null,
+    val session: ExamSession? = null,
+    val location: String = "",
+    val unitIds: List<String> = emptyList(),
+    val grades: List<Int> = emptyList()
+)
+
+enum class ExamSittingStatus { UPCOMING, TODAY, STARTED, COMPLETED }
+
+fun ExamSubject.daysRemaining(): Long =
+    java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)
+
+/** Real status computed from device date/time — never hardcoded. */
+fun ExamSubject.status(): ExamSittingStatus {
+    val today = LocalDate.now()
+    return when {
+        date.isBefore(today) -> ExamSittingStatus.COMPLETED
+        date.isAfter(today) -> ExamSittingStatus.UPCOMING
+        time != null && LocalTime.now().isAfter(time) -> ExamSittingStatus.STARTED
+        else -> ExamSittingStatus.TODAY
+    }
+}
+
+fun ExamSittingStatus.label(daysRemaining: Long): String = when (this) {
+    ExamSittingStatus.COMPLETED -> "COMPLETED"
+    ExamSittingStatus.STARTED -> "STARTED"
+    ExamSittingStatus.TODAY -> "TODAY"
+    ExamSittingStatus.UPCOMING -> "$daysRemaining DAYS LEFT"
+}
+
+/**
+ * Urgent Plan window: automatic, not a manually registered plan. Any Mid,
+ * Final, or Mock exam sitting entering 16-20 days remaining is "urgent" —
+ * this should drive real planning logic later (Exam Prep Engine, v0.11.0),
+ * not just a visual label.
+ */
+fun ExamSubject.isUrgent(): Boolean = daysRemaining() in 16..20
 
 /** A one-off task — homework, urgent revision, anything not part of the normal plan. */
 enum class TemporaryPlanType {
@@ -197,22 +255,3 @@ fun Subject.totalWeight(): Double = assessmentTypes.sumOf { it.weightPercent }
 
 /** True once every AssessmentType for the subject has a recorded score. */
 fun Subject.isFullyGraded(): Boolean = assessmentTypes.isNotEmpty() && assessmentTypes.all { it.entry != null }
-
-/** Days between today and the exam date. Negative if the date has passed. */
-fun Exam.daysRemaining(): Long =
-    java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)
-
-/** Exact years / months / days remaining, for a readable long-range countdown. */
-data class Countdown(val years: Int, val months: Int, val days: Int, val totalDays: Long)
-
-fun Exam.countdown(): Countdown {
-    val today = LocalDate.now()
-    val period = java.time.Period.between(today, date)
-    val totalDays = java.time.temporal.ChronoUnit.DAYS.between(today, date)
-    return Countdown(
-        years = period.years,
-        months = period.months,
-        days = period.days,
-        totalDays = totalDays
-    )
-}

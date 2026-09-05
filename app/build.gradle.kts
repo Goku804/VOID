@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.core.voidapp"
         minSdk = 23
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.9.0"
+        versionCode = 14
+        versionName = "0.10.0"
     }
 
     buildFeatures {
@@ -41,5 +42,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.7.8")
     implementation("androidx.compose.material3:material3:1.3.1")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Room — persistence layer (v1.0.0)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }
