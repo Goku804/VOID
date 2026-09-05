@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.ClassType
 import com.core.voidapp.data.DayOfWeekVoid
 import com.core.voidapp.data.VoidRepository
+import com.core.voidapp.data.isDClassSession
 import java.time.LocalTime
 
 private val SBlack = Color(0xFF050505)
