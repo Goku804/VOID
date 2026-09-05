@@ -4,6 +4,8 @@
     <application
         android:name=".VoidApplication"
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="VOID"
         android:supportsRtl="true"
         android:theme="@style/Theme.VOID">

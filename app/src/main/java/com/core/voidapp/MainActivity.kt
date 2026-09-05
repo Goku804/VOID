@@ -38,7 +38,7 @@ import com.core.voidapp.data.label
 import com.core.voidapp.data.status
 
 const val APP_NAME = "VOID"
-const val APP_VERSION = "VOID v0.10.0"
+const val APP_VERSION = "VOID v0.10.1"
 
 class MainActivity : ComponentActivity() {
 
