@@ -82,7 +82,6 @@ private fun SettingsList(onOpen: (SettingsSection) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidColors.Background)
             .padding(16.dp)
     ) {
         Text("VOID", color = VoidColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -137,7 +136,6 @@ private fun SettingsSubScreen(title: String, onBack: () -> Unit, content: @Compo
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidColors.Background)
     ) {
         Row(
             modifier = Modifier

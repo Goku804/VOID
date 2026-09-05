@@ -60,7 +60,6 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidColors.Background)
             .padding(16.dp)
     ) {
         item {
@@ -224,7 +223,7 @@ private fun PlanNavCard(title: String, subtitle: String, modifier: Modifier = Mo
 
 @Composable
 private fun PlanSubScreen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(VoidColors.Background)) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically

@@ -72,7 +72,6 @@ fun ExamScheduleScreen() {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidColors.Background)
             .padding(16.dp)
     ) {
         item {

@@ -69,6 +69,8 @@ fun VoidApp() {
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
 
+                ParticleField(modifier = Modifier.fillMaxSize())
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -95,9 +97,7 @@ fun VoidApp() {
 
 @Composable
 fun HomeScreen() {
-    Box(modifier = Modifier.fillMaxSize().background(VoidColors.Background)) {
-        ParticleField(modifier = Modifier.fillMaxSize())
-
+    Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -358,7 +358,6 @@ fun PlaceholderScreen(title: String, subtitle: String, message: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidColors.Background)
             .padding(20.dp)
     ) {
         Text(APP_NAME, color = VoidColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
