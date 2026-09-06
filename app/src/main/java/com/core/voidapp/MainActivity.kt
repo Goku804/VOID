@@ -80,6 +80,7 @@ fun VoidApp() {
                         VoidDestination.HOME -> HomeScreen()
                         VoidDestination.PLAN -> PlanningScreen()
                         VoidDestination.EXECUTE -> ExecutionScreen()
+                        VoidDestination.CHAT -> ChatScreen(onOpenSettings = { selectedDest = VoidDestination.SETTINGS })
                         VoidDestination.SETTINGS -> SettingsScreen()
                     }
                 }

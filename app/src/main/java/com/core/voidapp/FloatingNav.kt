@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
@@ -45,6 +46,7 @@ enum class VoidDestination(val label: String, val icon: ImageVector) {
     HOME("HOME", Icons.Default.Home),
     PLAN("PLAN", Icons.Default.CalendarMonth),
     EXECUTE("EXECUTE", Icons.Default.PlayArrow),
+    CHAT("AI", Icons.Default.AutoAwesome),
     SETTINGS("SETTINGS", Icons.Default.Settings)
 }
 

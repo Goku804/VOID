@@ -40,7 +40,7 @@ private enum class SettingsSection(val title: String, val subtitle: String, val 
     EXAMS("EXAMS", "Exam Schedule", true),
     PLANNING("PLANNING", "Circle Plans \u00b7 Temporary Plans", false),
     REPORTS("REPORTS", "Daily \u00b7 Weekly \u00b7 Monthly", false),
-    INTEGRATIONS("INTEGRATIONS", "Telegram", false),
+    INTEGRATIONS("INTEGRATIONS", "AI Chat Configuration", true),
     NOTIFICATIONS("NOTIFICATIONS", "Alerts \u00b7 Reminders", false),
     APPEARANCE("APPEARANCE", "Theme \u00b7 Effects \u00b7 Animation", false),
     DATA("DATA", "Backup \u00b7 Restore \u00b7 Export", false),
@@ -70,6 +70,9 @@ fun SettingsScreen() {
         }
         SettingsSection.ABOUT -> SettingsSubScreen(section.title, onBack = { open = null }) {
             AboutContent()
+        }
+        SettingsSection.INTEGRATIONS -> SettingsSubScreen(section.title, onBack = { open = null }) {
+            AISettingsScreen()
         }
         else -> SettingsSubScreen(section.title, onBack = { open = null }) {
             ComingSoonContent(section.title)

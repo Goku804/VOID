@@ -37,6 +37,10 @@ object VoidRepository {
     val temporaryTasks = mutableStateListOf<TemporaryTask>()
     val nightAvailability = mutableStateListOf<NightAvailability>()
     val circlePlans = mutableStateListOf<CirclePlan>()
+    val chatConversations = mutableStateListOf<ChatConversation>()
+    val chatMessages = mutableStateListOf<ChatMessage>()
+
+    const val DEFAULT_CHAT_CONVERSATION_ID = "default"
 
     private var database: VoidDatabase? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -72,6 +76,8 @@ object VoidRepository {
             examSubjects.addAll(db.examSubjectDao().getAll().map { it.toModel() })
             circlePlans.addAll(db.circlePlanDao().getAll().map { it.toModel() })
             temporaryTasks.addAll(db.temporaryTaskDao().getAll().map { it.toModel() })
+            chatConversations.addAll(db.chatDao().getAllConversations().map { it.toModel() })
+            chatMessages.addAll(db.chatDao().getAllMessages().map { it.toModel() })
         }
     }
 
@@ -351,5 +357,29 @@ object VoidRepository {
 
     private fun persistSubject(subject: Subject) {
         ioScope.launch { database?.subjectDao()?.upsert(subject.toEntity()) }
+    }
+
+    /** Returns the single default AI Chat conversation, creating it on first use. */
+    fun defaultConversation(): ChatConversation {
+        chatConversations.find { it.id == DEFAULT_CHAT_CONVERSATION_ID }?.let { return it }
+        val conversation = ChatConversation(id = DEFAULT_CHAT_CONVERSATION_ID, title = "VOID AI")
+        chatConversations.add(conversation)
+        ioScope.launch { database?.chatDao()?.upsertConversation(conversation.toEntity()) }
+        return conversation
+    }
+
+    fun messagesFor(conversationId: String): List<ChatMessage> =
+        chatMessages.filter { it.conversationId == conversationId }.sortedBy { it.timestamp }
+
+    fun addChatMessage(conversationId: String, role: ChatRole, content: String): ChatMessage {
+        val message = ChatMessage(id = newId(), conversationId = conversationId, role = role, content = content)
+        chatMessages.add(message)
+        ioScope.launch { database?.chatDao()?.upsertMessage(message.toEntity()) }
+        return message
+    }
+
+    fun clearChatHistory(conversationId: String) {
+        chatMessages.removeAll { it.conversationId == conversationId }
+        ioScope.launch { database?.chatDao()?.deleteMessagesForConversation(conversationId) }
     }
 }

@@ -3,6 +3,9 @@ package com.core.voidapp.data.db
 import com.core.voidapp.data.AcademicUnit
 import com.core.voidapp.data.AssessmentKind
 import com.core.voidapp.data.AssessmentType
+import com.core.voidapp.data.ChatConversation
+import com.core.voidapp.data.ChatMessage
+import com.core.voidapp.data.ChatRole
 import com.core.voidapp.data.CirclePlan
 import com.core.voidapp.data.ClassPeriod
 import com.core.voidapp.data.ClassType
@@ -152,4 +155,20 @@ fun TemporaryTaskEntity.toModel() = TemporaryTask(
     priority = PlanPriority.valueOf(priority),
     unitIds = if (unitIds.isBlank()) emptyList() else unitIds.split(","),
     notes = notes, status = PlanTaskStatus.valueOf(status)
+)
+
+// ---------------------------------------------------------------------
+// Chat (conversations + messages)
+// ---------------------------------------------------------------------
+
+fun ChatConversation.toEntity() = ChatConversationEntity(id = id, title = title, createdAt = createdAt)
+
+fun ChatConversationEntity.toModel() = ChatConversation(id = id, title = title, createdAt = createdAt)
+
+fun ChatMessage.toEntity() = ChatMessageEntity(
+    id = id, conversationId = conversationId, role = role.name, content = content, timestamp = timestamp
+)
+
+fun ChatMessageEntity.toModel() = ChatMessage(
+    id = id, conversationId = conversationId, role = ChatRole.valueOf(role), content = content, timestamp = timestamp
 )

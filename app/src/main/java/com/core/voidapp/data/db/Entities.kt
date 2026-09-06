@@ -113,3 +113,21 @@ data class TemporaryTaskEntity(
     val notes: String,
     val status: String
 )
+
+/** One AI Chat conversation. v1.0.0 keeps a single default conversation; the table already supports more. */
+@Entity(tableName = "chat_conversations")
+data class ChatConversationEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val createdAt: Long
+)
+
+/** One message in a chat conversation. role is "USER" or "ASSISTANT" — never stores API keys or secrets. */
+@Entity(tableName = "chat_messages")
+data class ChatMessageEntity(
+    @PrimaryKey val id: String,
+    val conversationId: String,
+    val role: String,
+    val content: String,
+    val timestamp: Long
+)

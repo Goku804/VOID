@@ -112,3 +112,21 @@ interface TemporaryTaskDao {
     @Query("DELETE FROM temporary_tasks WHERE id = :id")
     suspend fun deleteById(id: String)
 }
+
+@Dao
+interface ChatDao {
+    @Query("SELECT * FROM chat_conversations")
+    suspend fun getAllConversations(): List<ChatConversationEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertConversation(entity: ChatConversationEntity)
+
+    @Query("SELECT * FROM chat_messages")
+    suspend fun getAllMessages(): List<ChatMessageEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMessage(entity: ChatMessageEntity)
+
+    @Query("DELETE FROM chat_messages WHERE conversationId = :conversationId")
+    suspend fun deleteMessagesForConversation(conversationId: String)
+}
