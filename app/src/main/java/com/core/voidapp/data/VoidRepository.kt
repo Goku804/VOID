@@ -40,8 +40,6 @@ object VoidRepository {
     val chatConversations = mutableStateListOf<ChatConversation>()
     val chatMessages = mutableStateListOf<ChatMessage>()
 
-    const val DEFAULT_CHAT_CONVERSATION_ID = "default"
-
     private var database: VoidDatabase? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -359,25 +357,72 @@ object VoidRepository {
         ioScope.launch { database?.subjectDao()?.upsert(subject.toEntity()) }
     }
 
-    /** Returns the single default AI Chat conversation, creating it on first use. */
-    fun defaultConversation(): ChatConversation {
-        chatConversations.find { it.id == DEFAULT_CHAT_CONVERSATION_ID }?.let { return it }
-        val conversation = ChatConversation(id = DEFAULT_CHAT_CONVERSATION_ID, title = "VOID AI")
+    /** All AI Chat conversations, most recently created first — the shape the sidebar reads. */
+    fun allConversations(): List<ChatConversation> =
+        chatConversations.sortedByDescending { it.createdAt }
+
+    /** Starts a brand-new, empty conversation and makes it current. */
+    fun createConversation(title: String = "New chat"): ChatConversation {
+        val conversation = ChatConversation(id = newId(), title = title)
         chatConversations.add(conversation)
         ioScope.launch { database?.chatDao()?.upsertConversation(conversation.toEntity()) }
         return conversation
     }
 
+    fun renameConversation(conversationId: String, title: String) {
+        val idx = chatConversations.indexOfFirst { it.id == conversationId }
+        if (idx == -1) return
+        val updated = chatConversations[idx].copy(title = title)
+        chatConversations[idx] = updated
+        ioScope.launch { database?.chatDao()?.upsertConversation(updated.toEntity()) }
+    }
+
+    /** Deletes a whole conversation and every message in it — unlike clearChatHistory, this removes the thread itself. */
+    fun deleteConversation(conversationId: String) {
+        chatConversations.removeAll { it.id == conversationId }
+        chatMessages.removeAll { it.conversationId == conversationId }
+        ioScope.launch {
+            database?.chatDao()?.deleteMessagesForConversation(conversationId)
+            database?.chatDao()?.deleteConversation(conversationId)
+        }
+    }
+
     fun messagesFor(conversationId: String): List<ChatMessage> =
         chatMessages.filter { it.conversationId == conversationId }.sortedBy { it.timestamp }
 
+    /**
+     * Appends a message and persists it. Also auto-titles the conversation
+     * from the first user message it ever receives (still "New chat" up to
+     * that point) — same behavior users already know from other AI chat
+     * apps, so a growing conversation list stays scannable without the
+     * user ever having to name anything themselves.
+     */
     fun addChatMessage(conversationId: String, role: ChatRole, content: String): ChatMessage {
         val message = ChatMessage(id = newId(), conversationId = conversationId, role = role, content = content)
         chatMessages.add(message)
         ioScope.launch { database?.chatDao()?.upsertMessage(message.toEntity()) }
+
+        if (role == ChatRole.USER) {
+            val idx = chatConversations.indexOfFirst { it.id == conversationId }
+            if (idx != -1) {
+                val convo = chatConversations[idx]
+                val isFirstUserMessage = chatMessages.none {
+                    it.conversationId == conversationId && it.role == ChatRole.USER && it.id != message.id
+                }
+                if (isFirstUserMessage && (convo.title.isBlank() || convo.title == "New chat" || convo.title == "VOID AI")) {
+                    val trimmed = content.trim()
+                    val autoTitle = if (trimmed.length > 40) "${trimmed.take(40)}\u2026" else trimmed
+                    val updated = convo.copy(title = autoTitle.ifBlank { "New chat" })
+                    chatConversations[idx] = updated
+                    ioScope.launch { database?.chatDao()?.upsertConversation(updated.toEntity()) }
+                }
+            }
+        }
+
         return message
     }
 
+    /** Clears every message in a conversation but keeps the thread itself — use deleteConversation to remove the thread too. */
     fun clearChatHistory(conversationId: String) {
         chatMessages.removeAll { it.conversationId == conversationId }
         ioScope.launch { database?.chatDao()?.deleteMessagesForConversation(conversationId) }

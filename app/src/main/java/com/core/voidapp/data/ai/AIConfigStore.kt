@@ -19,6 +19,7 @@ object AIConfigStore {
     private const val KEY_API_KEY = "api_key"
     private const val KEY_MODEL = "model"
     private const val KEY_BASE_URL = "base_url"
+    private const val KEY_TOOLS_ENABLED = "tools_enabled"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -48,6 +49,18 @@ object AIConfigStore {
     }
 
     fun isConfigured(context: Context): Boolean = load(context) != null
+
+    /**
+     * Whether the AI is allowed to create/edit/delete VOID data via tool
+     * calls (as opposed to read-only via AIContextBuilder). Granted by
+     * default — the user can revoke it in Settings -> Integrations -> AI.
+     */
+    fun setToolsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_TOOLS_ENABLED, enabled).apply()
+    }
+
+    fun areToolsEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_TOOLS_ENABLED, true)
 
     /** Never show the full key in UI — just enough to confirm which one is saved. */
     fun maskKey(key: String): String {

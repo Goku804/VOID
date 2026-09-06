@@ -1,5 +1,7 @@
 package com.core.voidapp.data.ai
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -20,12 +22,36 @@ object AIApiClient {
 
     private const val TIMEOUT_MS = 30_000
 
+    /** Hard ceiling on tool round-trips per user turn — stops a runaway tool loop from hammering the provider forever. */
+    private const val MAX_TOOL_ITERATIONS = 6
+
     /** Sends the full conversation (role, content) pairs and returns the assistant's reply text. Throws AIException on failure. */
     fun sendMessage(config: AIConfig, systemPrompt: String, history: List<Pair<String, String>>): String =
         when (config.provider) {
             AIProvider.ANTHROPIC -> sendAnthropic(config, systemPrompt, history)
             AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiCompatible(config, systemPrompt, history)
         }
+
+    /**
+     * Same as sendMessage, but offers the model a set of tools it can call
+     * (create/edit/delete/analyze VOID data) and loops — executing each
+     * tool call via [executeTool] and feeding the result back — until the
+     * model answers with plain text or the iteration ceiling is hit.
+     * [executeTool] is called on whichever dispatcher this suspend
+     * function is running on (network calls are the only part pushed onto
+     * Dispatchers.IO), so it's safe for it to touch in-memory app state
+     * directly.
+     */
+    suspend fun sendMessageWithTools(
+        config: AIConfig,
+        systemPrompt: String,
+        history: List<Pair<String, String>>,
+        tools: List<AIToolDef>,
+        executeTool: suspend (name: String, input: JSONObject) -> String
+    ): AIToolLoopResult = when (config.provider) {
+        AIProvider.ANTHROPIC -> sendAnthropicWithTools(config, systemPrompt, history, tools, executeTool)
+        AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiWithTools(config, systemPrompt, history, tools, executeTool)
+    }
 
     /** Lightweight reachability + auth check — reports success/failure only, never exposes the key. */
     fun testConnection(config: AIConfig): Result<Unit> = try {
@@ -163,7 +189,8 @@ object AIApiClient {
             configure()
         }
 
-    private fun execute(conn: HttpURLConnection, body: JSONObject, parse: (JSONObject) -> String): String {
+    /** Sends the request body and returns the raw parsed JSON response. Throws AIException on any failure. */
+    private fun postJson(conn: HttpURLConnection, body: JSONObject): JSONObject {
         try {
             conn.outputStream.use { it.write(body.toString().toByteArray(StandardCharsets.UTF_8)) }
 
@@ -178,9 +205,7 @@ object AIApiClient {
                 throw AIException(providerMessage?.takeIf { it.isNotBlank() } ?: "Request failed (HTTP $code).")
             }
 
-            val reply = parse(JSONObject(text))
-            if (reply.isBlank()) throw AIException("Empty response from AI provider.")
-            return reply
+            return JSONObject(text)
         } catch (e: AIException) {
             throw e
         } catch (e: IOException) {
@@ -190,5 +215,159 @@ object AIApiClient {
         } finally {
             conn.disconnect()
         }
+    }
+
+    private fun execute(conn: HttpURLConnection, body: JSONObject, parse: (JSONObject) -> String): String {
+        val reply = parse(postJson(conn, body))
+        if (reply.isBlank()) throw AIException("Empty response from AI provider.")
+        return reply
+    }
+
+    /** Trims a tool call's input to something short enough to show in an action log line. */
+    private fun summarizeInput(input: JSONObject): String {
+        val s = input.toString()
+        return if (s.length > 140) s.take(140) + "\u2026" else s
+    }
+
+    private suspend fun sendAnthropicWithTools(
+        config: AIConfig,
+        systemPrompt: String,
+        history: List<Pair<String, String>>,
+        tools: List<AIToolDef>,
+        executeTool: suspend (String, JSONObject) -> String
+    ): AIToolLoopResult {
+        val base = config.baseUrl.ifBlank { AIProvider.ANTHROPIC.defaultBaseUrl }.trimEnd('/')
+        val messages = JSONArray()
+        history.forEach { (role, content) -> messages.put(JSONObject().put("role", role).put("content", content)) }
+
+        val toolsJson = JSONArray()
+        tools.forEach { toolsJson.put(JSONObject().put("name", it.name).put("description", it.description).put("input_schema", it.inputSchema)) }
+
+        val actionsLog = mutableListOf<String>()
+
+        repeat(MAX_TOOL_ITERATIONS) {
+            val body = JSONObject()
+                .put("model", config.model.ifBlank { AIProvider.ANTHROPIC.defaultModel })
+                .put("max_tokens", 1024)
+                .put("system", systemPrompt)
+                .put("messages", messages)
+            if (toolsJson.length() > 0) body.put("tools", toolsJson)
+
+            val response = withContext(Dispatchers.IO) {
+                val conn = openConnection("$base/messages") {
+                    setRequestProperty("x-api-key", config.apiKey)
+                    setRequestProperty("anthropic-version", "2023-06-01")
+                }
+                postJson(conn, body)
+            }
+
+            val contentArr = response.getJSONArray("content")
+            val textParts = StringBuilder()
+            val toolUses = mutableListOf<JSONObject>()
+            for (i in 0 until contentArr.length()) {
+                val block = contentArr.getJSONObject(i)
+                when (block.optString("type")) {
+                    "text" -> textParts.append(block.optString("text"))
+                    "tool_use" -> toolUses += block
+                }
+            }
+
+            if (toolUses.isEmpty()) {
+                return AIToolLoopResult(textParts.toString().ifBlank { "OK." }, actionsLog)
+            }
+
+            // The assistant turn must be echoed back verbatim (including
+            // its tool_use blocks) so the tool_result below can reference
+            // the same tool_use_id — Anthropic requires this pairing.
+            messages.put(JSONObject().put("role", "assistant").put("content", contentArr))
+
+            val resultsContent = JSONArray()
+            toolUses.forEach { block ->
+                val toolName = block.getString("name")
+                val toolInput = block.optJSONObject("input") ?: JSONObject()
+                val toolUseId = block.getString("id")
+                val resultText = executeTool(toolName, toolInput)
+                actionsLog += "$toolName(${summarizeInput(toolInput)}) \u2192 $resultText"
+                resultsContent.put(
+                    JSONObject()
+                        .put("type", "tool_result")
+                        .put("tool_use_id", toolUseId)
+                        .put("content", resultText)
+                )
+            }
+            messages.put(JSONObject().put("role", "user").put("content", resultsContent))
+        }
+
+        return AIToolLoopResult(
+            "I performed several actions but hit the step limit before finishing my reply. Check the app to confirm everything is as expected.",
+            actionsLog
+        )
+    }
+
+    private suspend fun sendOpenAiWithTools(
+        config: AIConfig,
+        systemPrompt: String,
+        history: List<Pair<String, String>>,
+        tools: List<AIToolDef>,
+        executeTool: suspend (String, JSONObject) -> String
+    ): AIToolLoopResult {
+        val base = config.baseUrl.ifBlank { AIProvider.OPENAI.defaultBaseUrl }.trimEnd('/')
+        val messages = JSONArray()
+        messages.put(JSONObject().put("role", "system").put("content", systemPrompt))
+        history.forEach { (role, content) -> messages.put(JSONObject().put("role", role).put("content", content)) }
+
+        val toolsJson = JSONArray()
+        tools.forEach {
+            toolsJson.put(
+                JSONObject().put("type", "function").put(
+                    "function",
+                    JSONObject().put("name", it.name).put("description", it.description).put("parameters", it.inputSchema)
+                )
+            )
+        }
+
+        val actionsLog = mutableListOf<String>()
+
+        repeat(MAX_TOOL_ITERATIONS) {
+            val body = JSONObject()
+                .put("model", config.model.ifBlank { AIProvider.OPENAI.defaultModel })
+                .put("messages", messages)
+            if (toolsJson.length() > 0) body.put("tools", toolsJson)
+
+            val response = withContext(Dispatchers.IO) {
+                val conn = openConnection("$base/chat/completions") {
+                    setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+                }
+                postJson(conn, body)
+            }
+
+            val message = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+            val toolCalls = message.optJSONArray("tool_calls")
+            val text = message.optString("content", "")
+
+            if (toolCalls == null || toolCalls.length() == 0) {
+                return AIToolLoopResult(text.ifBlank { "OK." }, actionsLog)
+            }
+
+            val assistantMsg = JSONObject().put("role", "assistant").put("tool_calls", toolCalls)
+            assistantMsg.put("content", if (text.isNotBlank()) text else JSONObject.NULL)
+            messages.put(assistantMsg)
+
+            for (i in 0 until toolCalls.length()) {
+                val call = toolCalls.getJSONObject(i)
+                val fn = call.getJSONObject("function")
+                val toolName = fn.getString("name")
+                val toolInput = runCatching { JSONObject(fn.optString("arguments", "{}")) }.getOrDefault(JSONObject())
+                val callId = call.getString("id")
+                val resultText = executeTool(toolName, toolInput)
+                actionsLog += "$toolName(${summarizeInput(toolInput)}) \u2192 $resultText"
+                messages.put(JSONObject().put("role", "tool").put("tool_call_id", callId).put("content", resultText))
+            }
+        }
+
+        return AIToolLoopResult(
+            "I performed several actions but hit the step limit before finishing my reply. Check the app to confirm everything is as expected.",
+            actionsLog
+        )
     }
 }

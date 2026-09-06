@@ -54,12 +54,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun VoidApp() {
     var selectedDest by remember { mutableStateOf(VoidDestination.HOME) }
+    var showAiChat by remember { mutableStateOf(false) }
     val navVisibility = rememberNavVisibilityState()
 
-    // Back should return to HOME first, then exit on a second press —
-    // matches normal Android behavior instead of closing from any tab.
-    androidx.activity.compose.BackHandler(enabled = selectedDest != VoidDestination.HOME) {
-        selectedDest = VoidDestination.HOME
+    // Back closes the isolated AI Chat overlay first (if open), then
+    // returns to HOME, then exits on a further press — matches normal
+    // Android behavior instead of closing from any tab.
+    androidx.activity.compose.BackHandler(enabled = showAiChat || selectedDest != VoidDestination.HOME) {
+        if (showAiChat) showAiChat = false else selectedDest = VoidDestination.HOME
     }
 
     MaterialTheme {
@@ -79,23 +81,46 @@ fun VoidApp() {
                     when (selectedDest) {
                         VoidDestination.HOME -> HomeScreen()
                         VoidDestination.PLAN -> PlanningScreen()
-                        VoidDestination.CHAT -> ChatScreen(
-                            onOpenSettings = { selectedDest = VoidDestination.SETTINGS },
-                            onBack = { selectedDest = VoidDestination.HOME }
-                        )
+                        VoidDestination.EXECUTE -> ExecutionScreen()
                         VoidDestination.SETTINGS -> SettingsScreen()
                     }
                 }
 
-                // Hidden entirely on the AI Chat screen (not just scroll-hidden) —
-                // that screen needs the full height; back out via the phone's
-                // natural back gesture/button or the back arrow in its top bar.
                 FloatingBottomNav(
                     selected = selectedDest,
-                    visible = navVisibility.visible.value && selectedDest != VoidDestination.CHAT,
+                    visible = navVisibility.visible.value && !showAiChat,
                     onSelect = { selectedDest = it },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
+
+                // Isolated on purpose — its own corner, its own tap target,
+                // separate from the tab row below. Opens a full-screen
+                // overlay rather than swapping out whatever tab is active.
+                FloatingAiButton(
+                    visible = !showAiChat,
+                    onClick = { showAiChat = true },
+                    modifier = Modifier.align(Alignment.TopStart)
+                )
+
+                // Full-screen, isolated AI Chat overlay: solid background of
+                // its own, so nothing behind it — particles, bottom nav,
+                // whatever tab was open — shows through or is reachable
+                // until the user explicitly backs out or taps close.
+                if (showAiChat) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(VoidColors.Background)
+                    ) {
+                        ChatScreen(
+                            onOpenSettings = {
+                                showAiChat = false
+                                selectedDest = VoidDestination.SETTINGS
+                            },
+                            onClose = { showAiChat = false }
+                        )
+                    }
+                }
             }
         }
     }

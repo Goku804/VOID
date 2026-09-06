@@ -26,6 +26,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,6 +75,7 @@ fun AISettingsScreen() {
     var status by remember { mutableStateOf<String?>(null) }
     var statusColor by remember { mutableStateOf(VoidColors.TextSecondary) }
     var testing by remember { mutableStateOf(false) }
+    var toolsEnabled by remember { mutableStateOf(AIConfigStore.areToolsEnabled(context)) }
     val scope = rememberCoroutineScope()
     val hasSavedKey = savedConfig != null
 
@@ -202,6 +205,44 @@ fun AISettingsScreen() {
             VoidSectionLabel("BASE URL")
             Spacer(modifier = Modifier.height(8.dp))
             SettingsField(value = baseUrl, onValueChange = { baseUrl = it }, placeholder = "https://your-provider.example.com/v1")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        VoidSectionLabel("AI PERMISSIONS")
+        Spacer(modifier = Modifier.height(8.dp))
+        VoidCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "CREATE \u00b7 EDIT \u00b7 DELETE \u00b7 ANALYZE",
+                        color = VoidColors.TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Lets VOID AI act directly on your data \u2014 subjects, tasks, exams, Circle Plan slots, and scores \u2014 instead of only reading it. Granted by default; turn off for read-only.",
+                        color = VoidColors.TextSecondary,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Switch(
+                    checked = toolsEnabled,
+                    onCheckedChange = {
+                        toolsEnabled = it
+                        AIConfigStore.setToolsEnabled(context, it)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = VoidColors.Success,
+                        checkedTrackColor = VoidColors.Success.copy(alpha = 0.4f),
+                        uncheckedThumbColor = VoidColors.TextSecondary,
+                        uncheckedTrackColor = VoidColors.Surface2
+                    )
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))

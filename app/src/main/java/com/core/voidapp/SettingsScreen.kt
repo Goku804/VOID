@@ -34,10 +34,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// EXECUTE used to live here — it's now its own bottom-nav destination
+// (VoidDestination.EXECUTE in FloatingNav.kt / MainActivity.kt), in the
+// slot AI Chat used to occupy before AI Chat became its own isolated
+// floating-button overlay.
 private enum class SettingsSection(val title: String, val subtitle: String, val ready: Boolean) {
     ACADEMIC("ACADEMIC", "Subjects \u00b7 Marks \u00b7 Exams", true),
     SCHEDULE("SCHEDULE", "Timetable \u00b7 Classes \u00b7 Calendar", true),
-    EXECUTE("EXECUTE", "Study Sessions \u00b7 Progress", true),
     EXAMS("EXAMS", "Exam Schedule", true),
     PLANNING("PLANNING", "Circle Plans \u00b7 Temporary Plans", false),
     REPORTS("REPORTS", "Daily \u00b7 Weekly \u00b7 Monthly", false),
@@ -65,9 +68,6 @@ fun SettingsScreen() {
         }
         SettingsSection.SCHEDULE -> SettingsSubScreen(section.title, onBack = { open = null }) {
             SetupScreen()
-        }
-        SettingsSection.EXECUTE -> SettingsSubScreen(section.title, onBack = { open = null }) {
-            ExecutionScreen()
         }
         SettingsSection.EXAMS -> SettingsSubScreen(section.title, onBack = { open = null }) {
             ExamScheduleScreen()

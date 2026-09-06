@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -36,10 +38,16 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.dp
 
+/**
+ * AI Chat is deliberately NOT a destination here anymore — it's an
+ * isolated full-screen overlay reachable from its own floating button
+ * (see FloatingAiButton below), not a tab you switch into. EXECUTE fills
+ * the slot it used to occupy, moved here from inside Settings.
+ */
 enum class VoidDestination(val label: String, val icon: ImageVector) {
     HOME("HOME", Icons.Default.Home),
     PLAN("PLAN", Icons.Default.CalendarMonth),
-    CHAT("AI", Icons.Default.AutoAwesome),
+    EXECUTE("EXECUTE", Icons.Default.Bolt),
     SETTINGS("SETTINGS", Icons.Default.Settings)
 }
 
@@ -93,6 +101,45 @@ fun FloatingBottomNav(
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+    }
+}
+
+/**
+ * Isolated entry point into AI Chat — deliberately separate from
+ * FloatingBottomNav, in its own corner, with its own tap target. Tapping
+ * it opens a full-screen overlay (not a tab swap), so it needs to read as
+ * its own thing rather than a fifth item bolted onto the nav row.
+ */
+@Composable
+fun FloatingAiButton(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(VoidMotion.NAV_HIDE_MS)),
+        exit = fadeOut(tween(VoidMotion.NAV_HIDE_MS)),
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(16.dp)
+                .size(48.dp)
+                .clip(RoundedCornerShape(50))
+                .background(VoidColors.Surface)
+                .border(1.dp, VoidColors.Purple.copy(alpha = 0.5f), RoundedCornerShape(50))
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = "Open AI Chat",
+                tint = VoidColors.Purple,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }

@@ -23,6 +23,8 @@ If information needed to answer is missing from CONTEXT, say so plainly instead 
 CONTEXT includes a PLANNING ENGINE section listing deterministic, rule-based priorities computed outside of you — defer to its ordering and explain/build on it, rather than inventing a competing schedule of your own.
 Be concise, direct, and practical. This is a study-planning tool, not a general-purpose chatbot."""
 
+    private const val TOOLS_PROMPT_SUFFIX = """You have tool access to directly create, edit, delete, and analyze data inside VOID: subjects, tasks, exams, Circle Plan slots, and recorded scores. When the user asks you to add, change, remove, complete, or look up something concrete, actually call the relevant tool rather than just describing what you would do — then confirm what happened in plain language. Only call a delete tool when the user's message clearly asked for that item to be removed. Call get_full_snapshot before answering anything that needs full detail, totals, or a comparison across everything, since the CONTEXT block below is a summary, not the whole picture."""
+
     fun isConfigured(context: Context): Boolean = AIConfigStore.isConfigured(context)
 
     /** Persists the user's message, then requests and persists the AI's reply. */
@@ -52,13 +54,36 @@ Be concise, direct, and practical. This is a study-planning tool, not a general-
 
         val lastUserMessage = VoidRepository.messagesFor(conversationId).lastOrNull { it.role == ChatRole.USER }?.content ?: ""
         val contextBlock = AIContextBuilder.build(lastUserMessage)
-        val systemPrompt = "$SYSTEM_PROMPT_PREFIX\n\nCONTEXT:\n$contextBlock"
+        val toolsEnabled = AIConfigStore.areToolsEnabled(context)
+        val systemPrompt = buildString {
+            append(SYSTEM_PROMPT_PREFIX)
+            if (toolsEnabled) {
+                append("\n\n")
+                append(TOOLS_PROMPT_SUFFIX)
+            }
+            append("\n\nCONTEXT:\n")
+            append(contextBlock)
+        }
         val history = VoidRepository.messagesFor(conversationId).map {
             (if (it.role == ChatRole.USER) "user" else "assistant") to it.content
         }
+        val tools = if (toolsEnabled) AITools.definitions() else emptyList()
 
         return try {
-            val reply = withContext(Dispatchers.IO) { AIApiClient.sendMessage(config, systemPrompt, history) }
+            // Tool execution happens inline on whichever dispatcher this
+            // runs on (Main, from the Chat screen's coroutine scope) — only
+            // the network calls themselves are pushed onto Dispatchers.IO
+            // inside AIApiClient. That keeps VoidRepository's in-memory
+            // state mutations off a background thread.
+            val result = AIApiClient.sendMessageWithTools(config, systemPrompt, history, tools) { name, input ->
+                AIToolExecutor.execute(name, input)
+            }
+            val reply = if (result.actionsLog.isEmpty()) {
+                result.finalText
+            } else {
+                val log = result.actionsLog.joinToString("\n") { "\u2022 $it" }
+                "[${result.actionsLog.size} action(s) performed]\n$log\n\n${result.finalText}"
+            }
             VoidRepository.addChatMessage(conversationId, ChatRole.ASSISTANT, reply)
             AIResult.Success(reply)
         } catch (e: AIException) {
