@@ -24,7 +24,7 @@ object AIApiClient {
     fun sendMessage(config: AIConfig, systemPrompt: String, history: List<Pair<String, String>>): String =
         when (config.provider) {
             AIProvider.ANTHROPIC -> sendAnthropic(config, systemPrompt, history)
-            AIProvider.OPENAI, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiCompatible(config, systemPrompt, history)
+            AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiCompatible(config, systemPrompt, history)
         }
 
     /** Lightweight reachability + auth check — reports success/failure only, never exposes the key. */
@@ -35,6 +35,75 @@ object AIApiClient {
         Result.failure(e)
     } catch (e: Exception) {
         Result.failure(AIException("Unexpected error during test."))
+    }
+
+    /**
+     * Fetches the provider's real list of available model IDs, so the user
+     * can pick from what actually exists instead of typing a model name
+     * blind. Works for any provider that exposes a /models listing
+     * endpoint — which OpenAI, Groq, and Anthropic all do.
+     */
+    fun fetchModels(config: AIConfig): Result<List<String>> = try {
+        val ids = when (config.provider) {
+            AIProvider.ANTHROPIC -> fetchAnthropicModels(config)
+            AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> fetchOpenAiCompatibleModels(config)
+        }
+        Result.success(ids)
+    } catch (e: AIException) {
+        Result.failure(e)
+    } catch (e: Exception) {
+        Result.failure(AIException("Could not load model list."))
+    }
+
+    private fun fetchOpenAiCompatibleModels(config: AIConfig): List<String> {
+        val base = config.baseUrl.ifBlank { AIProvider.OPENAI.defaultBaseUrl }.trimEnd('/')
+        val conn = (URL("$base/models").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            setRequestProperty("Authorization", "Bearer ${config.apiKey}")
+        }
+        val json = executeGet(conn)
+        val data = json.getJSONArray("data")
+        return (0 until data.length()).map { data.getJSONObject(it).getString("id") }.sorted()
+    }
+
+    private fun fetchAnthropicModels(config: AIConfig): List<String> {
+        val base = config.baseUrl.ifBlank { AIProvider.ANTHROPIC.defaultBaseUrl }.trimEnd('/')
+        val conn = (URL("$base/models").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            setRequestProperty("x-api-key", config.apiKey)
+            setRequestProperty("anthropic-version", "2023-06-01")
+        }
+        val json = executeGet(conn)
+        val data = json.getJSONArray("data")
+        return (0 until data.length()).map { data.getJSONObject(it).getString("id") }.sorted()
+    }
+
+    private fun executeGet(conn: HttpURLConnection): JSONObject {
+        try {
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() } ?: ""
+
+            if (code !in 200..299) {
+                val providerMessage = runCatching {
+                    JSONObject(text).optJSONObject("error")?.optString("message")
+                }.getOrNull()
+                throw AIException(providerMessage?.takeIf { it.isNotBlank() } ?: "Request failed (HTTP $code).")
+            }
+            return JSONObject(text)
+        } catch (e: AIException) {
+            throw e
+        } catch (e: IOException) {
+            throw AIException("Could not reach the AI provider. Check your connection.")
+        } catch (e: Exception) {
+            throw AIException("Unexpected error talking to the AI provider.")
+        } finally {
+            conn.disconnect()
+        }
     }
 
     private fun sendAnthropic(config: AIConfig, systemPrompt: String, history: List<Pair<String, String>>): String {

@@ -143,9 +143,59 @@ fun AISettingsScreen() {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
+        var showModelPicker by remember { mutableStateOf(false) }
+        var loadingModels by remember { mutableStateOf(false) }
+
         VoidSectionLabel("MODEL")
         Spacer(modifier = Modifier.height(8.dp))
         SettingsField(value = model, onValueChange = { model = it }, placeholder = provider.defaultModel.ifBlank { "model name" })
+        Spacer(modifier = Modifier.height(6.dp))
+        Box {
+            Text(
+                text = if (loadingModels) "LOADING MODELS..." else "SEE AVAILABLE MODELS FOR THIS KEY",
+                color = VoidColors.Cyan,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.clickable(enabled = !loadingModels) {
+                    val key = if (editingKey && apiKeyInput.isNotBlank()) apiKeyInput.trim() else savedConfig?.apiKey.orEmpty()
+                    if (key.isBlank()) {
+                        status = "Enter an API key first."
+                        statusColor = VoidColors.Warning
+                        return@clickable
+                    }
+                    loadingModels = true
+                    status = null
+                    val config = AIConfig(provider = provider, apiKey = key, model = model, baseUrl = baseUrl.ifBlank { provider.defaultBaseUrl })
+                    scope.launch {
+                        AIRepository.fetchModels(config).fold(
+                            onSuccess = { models ->
+                                availableModels = models
+                                showModelPicker = models.isNotEmpty()
+                                if (models.isEmpty()) {
+                                    status = "Provider returned no models."
+                                    statusColor = VoidColors.Warning
+                                }
+                            },
+                            onFailure = {
+                                status = it.message ?: "Could not load model list."
+                                statusColor = VoidColors.Danger
+                            }
+                        )
+                        loadingModels = false
+                    }
+                }
+            )
+            DropdownMenu(expanded = showModelPicker, onDismissRequest = { showModelPicker = false }) {
+                availableModels.forEach { id ->
+                    DropdownMenuItem(
+                        text = { Text(id, fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
+                        onClick = { model = id; showModelPicker = false }
+                    )
+                }
+            }
+        }
 
         if (provider == AIProvider.OPENAI_COMPATIBLE) {
             Spacer(modifier = Modifier.height(16.dp))

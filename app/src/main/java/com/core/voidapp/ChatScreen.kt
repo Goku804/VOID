@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Send
@@ -67,7 +68,7 @@ import kotlinx.coroutines.launch
  * own navigation.
  */
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit) {
+fun ChatScreen(onOpenSettings: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val conversation = remember { VoidRepository.defaultConversation() }
     val messages = VoidRepository.chatMessages
@@ -121,6 +122,12 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBackIosNew,
+                contentDescription = "Back",
+                tint = VoidColors.TextSecondary,
+                modifier = Modifier.clickable { onBack() }.padding(end = 10.dp)
+            )
             Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = VoidColors.Purple, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {

@@ -22,10 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,19 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 enum class VoidDestination(val label: String, val icon: ImageVector) {
     HOME("HOME", Icons.Default.Home),
     PLAN("PLAN", Icons.Default.CalendarMonth),
-    EXECUTE("EXECUTE", Icons.Default.PlayArrow),
     CHAT("AI", Icons.Default.AutoAwesome),
     SETTINGS("SETTINGS", Icons.Default.Settings)
 }
@@ -105,10 +98,10 @@ fun FloatingBottomNav(
 }
 
 /**
- * Telegram-style: icon above label, BOTH always visible, only the color
- * changes on selection. No background pill — matches the reference image.
+ * Icon-only nav — no label text below the icon, to keep the bar compact.
  * Selected icon gets a soft layered glow behind it (cheap: 2 stacked
- * translucent circles, no real blur).
+ * translucent circles, no real blur) plus an accent tint; accessibility
+ * label still lives on contentDescription for screen readers.
  */
 @Composable
 private fun NavItem(
@@ -127,13 +120,13 @@ private fun NavItem(
             if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(50))
                         .background(VoidColors.NavAccent.copy(alpha = 0.10f))
                 )
                 Box(
                     modifier = Modifier
-                        .size(22.dp)
+                        .size(26.dp)
                         .clip(RoundedCornerShape(50))
                         .background(VoidColors.NavAccent.copy(alpha = 0.16f))
                 )
@@ -142,16 +135,8 @@ private fun NavItem(
                 imageVector = destination.icon,
                 contentDescription = destination.label,
                 tint = tint,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = destination.label,
-            color = tint,
-            fontSize = 9.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            fontFamily = FontFamily.Monospace
-        )
     }
 }

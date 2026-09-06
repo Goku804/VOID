@@ -41,6 +41,11 @@ Be concise, direct, and practical. This is a study-planning tool, not a general-
         )
     }
 
+    /** Fetches the real list of model IDs available to this key/provider. */
+    suspend fun fetchModels(config: AIConfig): Result<List<String>> = withContext(Dispatchers.IO) {
+        AIApiClient.fetchModels(config)
+    }
+
     private suspend fun callAI(context: Context, conversationId: String): AIResult {
         val config = AIConfigStore.load(context)
             ?: return AIResult.Failure("AI is not configured yet. Add an API key in Settings \u2192 Integrations \u2192 AI.")

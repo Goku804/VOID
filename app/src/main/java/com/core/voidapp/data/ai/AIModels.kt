@@ -7,8 +7,9 @@ package com.core.voidapp.data.ai
  */
 enum class AIProvider(val displayName: String, val defaultBaseUrl: String, val defaultModel: String) {
     OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini"),
-    ANTHROPIC("Anthropic", "https://api.anthropic.com/v1", "claude-3-5-haiku-latest"),
-    OPENAI_COMPATIBLE("OpenAI-compatible (custom endpoint)", "", "")
+    ANTHROPIC("Anthropic (Claude)", "https://api.anthropic.com/v1", "claude-3-5-haiku-latest"),
+    GROQ("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    OPENAI_COMPATIBLE("Other (OpenAI-compatible endpoint)", "", "")
 }
 
 /** Everything needed to make one API call. Never persisted anywhere except AIConfigStore. */

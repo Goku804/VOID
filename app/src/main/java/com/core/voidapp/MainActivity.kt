@@ -79,15 +79,20 @@ fun VoidApp() {
                     when (selectedDest) {
                         VoidDestination.HOME -> HomeScreen()
                         VoidDestination.PLAN -> PlanningScreen()
-                        VoidDestination.EXECUTE -> ExecutionScreen()
-                        VoidDestination.CHAT -> ChatScreen(onOpenSettings = { selectedDest = VoidDestination.SETTINGS })
+                        VoidDestination.CHAT -> ChatScreen(
+                            onOpenSettings = { selectedDest = VoidDestination.SETTINGS },
+                            onBack = { selectedDest = VoidDestination.HOME }
+                        )
                         VoidDestination.SETTINGS -> SettingsScreen()
                     }
                 }
 
+                // Hidden entirely on the AI Chat screen (not just scroll-hidden) —
+                // that screen needs the full height; back out via the phone's
+                // natural back gesture/button or the back arrow in its top bar.
                 FloatingBottomNav(
                     selected = selectedDest,
-                    visible = navVisibility.visible.value,
+                    visible = navVisibility.visible.value && selectedDest != VoidDestination.CHAT,
                     onSelect = { selectedDest = it },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
