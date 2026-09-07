@@ -10,6 +10,7 @@ import com.core.voidapp.data.PreferredWindow
 import com.core.voidapp.data.TemporaryPlanType
 import com.core.voidapp.data.VoidRepository
 import com.core.voidapp.data.status
+import com.core.voidapp.data.subjectsSorted
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -84,15 +85,17 @@ object AITools {
             obj("title" to str("Exact title of the task to delete"), required = listOf("title"))
         ),
         AIToolDef(
-            "create_exam", "Register an exam sitting (Mid, Final, or Mock) for a subject.",
+            "create_exam",
+            "Register an exam sitting (Test, Mid, Final, or Mock) for a subject. Calling this again with the same subject already covered creates a separate exam — to add a second subject under the SAME exam period (e.g. Physics also sitting the same Final), the user should register it through the app's multi-subject exam form instead; this tool always creates one exam per call.",
             obj(
-                "exam_type" to str("Exam type", enum = listOf("MID", "FINAL", "MOCK")),
+                "exam_type" to str("Exam type", enum = EXAM_TYPES),
                 "subject_name" to str("Subject name — must match an existing subject exactly"),
                 "date" to str("Exam date, ISO format YYYY-MM-DD"),
                 "time" to str("Optional time, 24h HH:mm"),
                 "session" to str("Optional session", enum = listOf("MORNING", "AFTERNOON", "EVENING", "CUSTOM")),
                 "location" to str("Optional location"),
                 "notes" to str("Optional notes"),
+                "grades" to str("Optional comma-separated grade levels this covers, e.g. '9,10,11' — meaningful mainly for MOCK"),
                 required = listOf("exam_type", "subject_name", "date")
             )
         ),
@@ -100,7 +103,7 @@ object AITools {
             "delete_exam", "Delete an exam sitting. Matches by subject name and exam type. Only use when the user clearly asked to remove it.",
             obj(
                 "subject_name" to str("Subject name of the exam sitting to delete"),
-                "exam_type" to str("Exam type", enum = listOf("MID", "FINAL", "MOCK")),
+                "exam_type" to str("Exam type", enum = EXAM_TYPES),
                 required = listOf("subject_name", "exam_type")
             )
         ),
@@ -140,6 +143,7 @@ object AITools {
     )
 
     private val DAYS = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
+    private val EXAM_TYPES = listOf("TEST", "MID", "FINAL", "MOCK")
 
     // ---- JSON schema helpers ----
     private fun str(desc: String, enum: List<String>? = null): JSONObject {
@@ -263,9 +267,11 @@ object AIToolExecutor {
             ?.let { runCatching { ExamSession.valueOf(it) }.getOrNull() }
         val location = input.optString("location", "")
         val notes = input.optString("notes", "")
+        val grades = input.optString("grades", "")
+            .split(",").mapNotNull { it.trim().toIntOrNull() }
         VoidRepository.registerExam(
             examType = examType, subjectId = subject.id, date = date, time = time,
-            session = session, location = location, notes = notes
+            session = session, location = location, notes = notes, grades = grades
         )
         return "Registered ${examType.name} exam for '${subject.name}' on $date."
     }
@@ -334,9 +340,12 @@ object AIToolExecutor {
             }.ifBlank { "none" }
         )
         sb.append("\nEXAMS: ").append(
-            VoidRepository.examSubjects.joinToString("; ") { es ->
-                val exam = VoidRepository.examFor(es)
-                "${exam?.examType?.name ?: "?"} ${VoidRepository.subjectName(es.subjectId)} on ${es.date} [${es.status()}]"
+            VoidRepository.exams.joinToString("; ") { exam ->
+                val subjects = exam.subjectsSorted().joinToString(", ") { es ->
+                    "${VoidRepository.subjectName(es.subjectId)} on ${es.date}${es.time?.let { " $it" } ?: ""} [${es.status()}]"
+                }
+                val gradesPart = if (exam.grades.isNotEmpty()) " grades=${exam.grades.sorted()}" else ""
+                "${exam.examType.name}(id=${exam.id})$gradesPart: $subjects"
             }.ifBlank { "none" }
         )
         sb.append("\nCIRCLE PLANS: ").append(

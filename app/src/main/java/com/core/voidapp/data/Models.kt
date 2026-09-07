@@ -20,7 +20,7 @@ enum class AssessmentKind {
 
 /** Exam Schedule type — a real upcoming exam event. NOT the same as AssessmentKind. */
 enum class ExamType {
-    MID, FINAL, MOCK
+    TEST, MID, FINAL, MOCK
 }
 
 /**
@@ -140,21 +140,29 @@ data class NightAvailability(
 enum class ExamSession { MORNING, AFTERNOON, EVENING, CUSTOM }
 
 /**
- * The exam event itself: what type of exam this is. Deliberately thin —
- * everything date/time/subject-specific lives on ExamSubject, since one
- * exam period can cover several subjects, each at its own time.
+ * The exam event itself: what type it is, and — for MID/FINAL/MOCK, which
+ * span several calendar days — the overall period. TEST doesn't need a
+ * range (it's a single-day event), so startDate/endDate stay null for it.
+ * grades lives here (not on ExamSubject) because "which grade levels sit
+ * this" is a property of the exam as a whole, not of any one subject —
+ * meaningful mainly for MOCK.
+ * Subject/date/time specifics live on ExamSubject: one Exam groups every
+ * subject sitting inside it, e.g. "Final Exam" containing Math on Monday
+ * and Physics on Tuesday are two ExamSubject rows sharing one Exam.
  */
 data class Exam(
     val id: String,
     val examType: ExamType,
-    val notes: String = ""
+    val notes: String = "",
+    val startDate: LocalDate? = null,
+    val endDate: LocalDate? = null,
+    val grades: List<Int> = emptyList()
 )
 
 /**
  * One subject's sitting within an exam — its own date/time/session/units.
- * "Mathematics Final, Monday 08:30" and "Physics Final, Monday 14:00" are
+ * "Mathematics Final, Monday 08:30" and "Physics Final, Tuesday 14:00" are
  * two ExamSubject rows under the same Final Exam.
- * grades is only meaningful when the parent Exam.examType == MOCK.
  */
 data class ExamSubject(
     val id: String,
@@ -164,8 +172,7 @@ data class ExamSubject(
     val time: LocalTime? = null,
     val session: ExamSession? = null,
     val location: String = "",
-    val unitIds: List<String> = emptyList(),
-    val grades: List<Int> = emptyList()
+    val unitIds: List<String> = emptyList()
 )
 
 enum class ExamSittingStatus { UPCOMING, TODAY, STARTED, COMPLETED }
@@ -198,6 +205,25 @@ fun ExamSittingStatus.label(daysRemaining: Long): String = when (this) {
  * not just a visual label.
  */
 fun ExamSubject.isUrgent(): Boolean = daysRemaining() in 16..20
+
+/** Every subject sitting under this exam, earliest first — what a grouped Exam card iterates over. */
+fun Exam.subjectsSorted(): List<ExamSubject> =
+    VoidRepository.examSubjects
+        .filter { it.examId == id }
+        .sortedWith(compareBy({ it.date }, { it.time ?: LocalTime.MIN }))
+
+/** The next sitting inside this exam that hasn't happened yet — drives the exam-level countdown on the Home card. */
+fun Exam.nearestUpcomingSubject(): ExamSubject? =
+    subjectsSorted().firstOrNull { it.status() != ExamSittingStatus.COMPLETED }
+
+/** True once every subject sitting inside this exam is in the past. */
+fun Exam.isFullyCompleted(): Boolean {
+    val subjects = subjectsSorted()
+    return subjects.isNotEmpty() && subjects.all { it.status() == ExamSittingStatus.COMPLETED }
+}
+
+/** Every distinct unit id covered anywhere inside this exam, across all its subjects. */
+fun Exam.allUnitIds(): List<String> = subjectsSorted().flatMap { it.unitIds }.distinct()
 
 /** A one-off task — homework, urgent revision, anything not part of the normal plan. */
 enum class TemporaryPlanType {

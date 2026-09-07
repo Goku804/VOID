@@ -44,30 +44,142 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.core.voidapp.data.Exam
 import com.core.voidapp.data.ExamSession
-import com.core.voidapp.data.ExamSittingStatus
 import com.core.voidapp.data.ExamSubject
 import com.core.voidapp.data.ExamType
 import com.core.voidapp.data.VoidRepository
+import com.core.voidapp.data.allUnitIds
 import com.core.voidapp.data.daysRemaining
 import com.core.voidapp.data.isUrgent
 import com.core.voidapp.data.label
+import com.core.voidapp.data.nearestUpcomingSubject
 import com.core.voidapp.data.status
+import com.core.voidapp.data.subjectsSorted
 import java.time.LocalDate
 import java.time.LocalTime
 
+/**
+ * Everything selected for one subject inside a single exam-registration
+ * pass: which units it covers, and — for MID/FINAL/MOCK, which span
+ * several days — its own date/time/session inside the overall period.
+ * For TEST these date/time/session fields go unused; the shared fields
+ * above the subject list apply to every subject instead.
+ */
+private data class SubjectExamDraft(
+    val unitIds: Set<String> = emptySet(),
+    val dateText: String = "",
+    val timeText: String = "",
+    val session: ExamSession? = null
+)
+
 @Composable
 fun ExamScheduleScreen() {
-    var examType by remember { mutableStateOf(ExamType.MID) }
-    var subjectId by remember { mutableStateOf<String?>(null) }
-    var dateText by remember { mutableStateOf("") }
-    var timeText by remember { mutableStateOf("") }
-    var session by remember { mutableStateOf<ExamSession?>(null) }
+    var examType by remember { mutableStateOf(ExamType.TEST) }
+    var subjectDrafts by remember { mutableStateOf(mapOf<String, SubjectExamDraft>()) }
+
+    // TEST only — one date/time/session shared by every selected subject.
+    var sharedDateText by remember { mutableStateOf("") }
+    var sharedTimeText by remember { mutableStateOf("") }
+    var sharedSession by remember { mutableStateOf<ExamSession?>(null) }
+
+    // MID / FINAL / MOCK only — the overall period the exam spans; each
+    // subject then gets its own date (below) inside that period.
+    var startDateText by remember { mutableStateOf("") }
+    var endDateText by remember { mutableStateOf("") }
+
+    // MOCK only — which grade levels this mock covers.
+    var selectedGrades by remember { mutableStateOf(setOf<Int>()) }
+
     var location by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    var selectedUnitIds by remember { mutableStateOf(setOf<String>()) }
-    var selectedGrades by remember { mutableStateOf(setOf<Int>()) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    fun toggleSubject(subjectId: String) {
+        subjectDrafts = if (subjectDrafts.containsKey(subjectId)) {
+            subjectDrafts - subjectId
+        } else {
+            subjectDrafts + (subjectId to SubjectExamDraft())
+        }
+    }
+
+    fun updateDraft(subjectId: String, update: (SubjectExamDraft) -> SubjectExamDraft) {
+        val current = subjectDrafts[subjectId] ?: return
+        subjectDrafts = subjectDrafts + (subjectId to update(current))
+    }
+
+    fun resetForm() {
+        subjectDrafts = emptyMap()
+        sharedDateText = ""; sharedTimeText = ""; sharedSession = null
+        startDateText = ""; endDateText = ""
+        selectedGrades = emptySet()
+        location = ""; notes = ""
+        error = null
+    }
+
+    fun save() {
+        if (subjectDrafts.isEmpty()) {
+            error = "Select at least one subject"
+            return
+        }
+        try {
+            var sharedExamId: String? = null
+
+            if (examType == ExamType.TEST) {
+                if (sharedDateText.isBlank()) {
+                    error = "Enter a date"
+                    return
+                }
+                val date = LocalDate.parse(sharedDateText.trim())
+                val time = sharedTimeText.trim().takeIf { it.isNotBlank() }?.let { LocalTime.parse(it) }
+
+                subjectDrafts.forEach { (subjectId, draft) ->
+                    val examId = sharedExamId
+                    if (examId == null) {
+                        val created = VoidRepository.registerExam(
+                            examType = ExamType.TEST, subjectId = subjectId, date = date, time = time,
+                            session = sharedSession, location = location.trim(), unitIds = draft.unitIds.toList(),
+                            notes = notes.trim()
+                        )
+                        sharedExamId = created.examId
+                    } else {
+                        VoidRepository.addExamSubject(examId, subjectId, date, time, sharedSession, location.trim(), draft.unitIds.toList())
+                    }
+                }
+            } else {
+                if (startDateText.isBlank() || endDateText.isBlank()) {
+                    error = "Enter a start and end date for the exam period"
+                    return
+                }
+                if (subjectDrafts.values.any { it.dateText.isBlank() }) {
+                    error = "Set a date for every selected subject"
+                    return
+                }
+                val startDate = LocalDate.parse(startDateText.trim())
+                val endDate = LocalDate.parse(endDateText.trim())
+
+                subjectDrafts.forEach { (subjectId, draft) ->
+                    val date = LocalDate.parse(draft.dateText.trim())
+                    val time = draft.timeText.trim().takeIf { it.isNotBlank() }?.let { LocalTime.parse(it) }
+                    val examId = sharedExamId
+                    if (examId == null) {
+                        val created = VoidRepository.registerExam(
+                            examType = examType, subjectId = subjectId, date = date, time = time,
+                            session = draft.session, location = location.trim(), unitIds = draft.unitIds.toList(),
+                            grades = selectedGrades.toList(), notes = notes.trim(),
+                            startDate = startDate, endDate = endDate
+                        )
+                        sharedExamId = created.examId
+                    } else {
+                        VoidRepository.addExamSubject(examId, subjectId, date, time, draft.session, location.trim(), draft.unitIds.toList())
+                    }
+                }
+            }
+            resetForm()
+        } catch (e: Exception) {
+            error = "Dates must be YYYY-MM-DD, time must be HH:MM"
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -90,43 +202,95 @@ fun ExamScheduleScreen() {
                     Text("Add a subject in SETTINGS \u2192 ACADEMIC first.", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 } else {
                     EExamTypeDropdown(selected = examType, onSelected = { examType = it })
-                    Spacer(modifier = Modifier.height(6.dp))
-                    ESubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it; selectedUnitIds = emptySet() })
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        EField(value = dateText, onValueChange = { dateText = it }, label = "Date (YYYY-MM-DD)", modifier = Modifier.weight(1f))
-                        EField(value = timeText, onValueChange = { timeText = it }, label = "Time (HH:MM)", modifier = Modifier.weight(1f))
+                    if (examType == ExamType.TEST) {
+                        Text("WHEN", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EDateField(value = sharedDateText, onValueChange = { sharedDateText = it }, label = "Date", modifier = Modifier.weight(1f))
+                            ETimeField(value = sharedTimeText, onValueChange = { sharedTimeText = it }, label = "Time (opt)", modifier = Modifier.weight(1f))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        ESessionDropdown(selected = sharedSession, onSelected = { sharedSession = it })
+                    } else {
+                        Text("EXAM PERIOD", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EDateField(value = startDateText, onValueChange = { startDateText = it }, label = "Start date", modifier = Modifier.weight(1f))
+                            EDateField(value = endDateText, onValueChange = { endDateText = it }, label = "End date", modifier = Modifier.weight(1f))
+                        }
                     }
 
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text("SUBJECTS", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
-                    ESessionDropdown(selected = session, onSelected = { session = it })
 
-                    if (subjectId != null) {
-                        val units = VoidRepository.unitsFor(subjectId!!)
-                        if (units.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("UNITS INCLUDED", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                            units.forEach { u ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable {
-                                        selectedUnitIds = if (selectedUnitIds.contains(u.id)) selectedUnitIds - u.id else selectedUnitIds + u.id
+                    VoidRepository.subjects.forEach { s ->
+                        val draft = subjectDrafts[s.id]
+                        val checked = draft != null
+
+                        Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { toggleSubject(s.id) }
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { toggleSubject(s.id) },
+                                    colors = CheckboxDefaults.colors(checkedColor = VoidColors.Accent, uncheckedColor = VoidColors.TextSecondary)
+                                )
+                                Text(s.name, color = VoidColors.TextPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                            }
+
+                            if (draft != null) {
+                                Column(modifier = Modifier.padding(start = 40.dp, bottom = 8.dp)) {
+                                    val units = VoidRepository.unitsFor(s.id)
+                                    if (units.isNotEmpty()) {
+                                        Text("UNITS", color = VoidColors.TextSecondary, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                        units.forEach { u ->
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.clickable {
+                                                    updateDraft(s.id) { d -> d.copy(unitIds = if (d.unitIds.contains(u.id)) d.unitIds - u.id else d.unitIds + u.id) }
+                                                }
+                                            ) {
+                                                Checkbox(
+                                                    checked = draft.unitIds.contains(u.id),
+                                                    onCheckedChange = { c -> updateDraft(s.id) { d -> d.copy(unitIds = if (c) d.unitIds + u.id else d.unitIds - u.id) } },
+                                                    colors = CheckboxDefaults.colors(checkedColor = VoidColors.Accent, uncheckedColor = VoidColors.TextSecondary)
+                                                )
+                                                Text("U${u.unitNumber} \u2014 ${u.name}", color = VoidColors.TextPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
                                     }
-                                ) {
-                                    Checkbox(
-                                        checked = selectedUnitIds.contains(u.id),
-                                        onCheckedChange = { checked -> selectedUnitIds = if (checked) selectedUnitIds + u.id else selectedUnitIds - u.id },
-                                        colors = CheckboxDefaults.colors(checkedColor = VoidColors.Accent, uncheckedColor = VoidColors.TextSecondary)
-                                    )
-                                    Text("U${u.unitNumber} \u2014 ${u.name}", color = VoidColors.TextPrimary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+
+                                    if (examType != ExamType.TEST) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            EDateField(
+                                                value = draft.dateText,
+                                                onValueChange = { v -> updateDraft(s.id) { d -> d.copy(dateText = v) } },
+                                                label = "${s.name} date",
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            ETimeField(
+                                                value = draft.timeText,
+                                                onValueChange = { v -> updateDraft(s.id) { d -> d.copy(timeText = v) } },
+                                                label = "Time (opt)",
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        ESessionDropdown(selected = draft.session, onSelected = { sel -> updateDraft(s.id) { d -> d.copy(session = sel) } })
+                                    }
                                 }
                             }
                         }
                     }
 
                     if (examType == ExamType.MOCK) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text("GRADES COVERED", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         Row {
                             listOf(9, 10, 11, 12).forEach { g ->
@@ -138,7 +302,7 @@ fun ExamScheduleScreen() {
                                 ) {
                                     Checkbox(
                                         checked = selectedGrades.contains(g),
-                                        onCheckedChange = { checked -> selectedGrades = if (checked) selectedGrades + g else selectedGrades - g },
+                                        onCheckedChange = { checked2 -> selectedGrades = if (checked2) selectedGrades + g else selectedGrades - g },
                                         colors = CheckboxDefaults.colors(checkedColor = VoidColors.Accent, uncheckedColor = VoidColors.TextSecondary)
                                     )
                                     Text("G$g", color = VoidColors.TextPrimary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
@@ -147,7 +311,7 @@ fun ExamScheduleScreen() {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     EField(value = location, onValueChange = { location = it }, label = "Location (optional)")
                     Spacer(modifier = Modifier.height(6.dp))
                     EField(value = notes, onValueChange = { notes = it }, label = "Notes (optional)")
@@ -158,34 +322,7 @@ fun ExamScheduleScreen() {
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
-                    EBigButton("+ SAVE EXAM") {
-                        val sid = subjectId
-                        when {
-                            sid == null -> error = "Select a subject"
-                            dateText.isBlank() -> error = "Enter a date"
-                            else -> {
-                                try {
-                                    val date = LocalDate.parse(dateText.trim())
-                                    val time = if (timeText.isBlank()) null else LocalTime.parse(timeText.trim())
-                                    VoidRepository.registerExam(
-                                        examType = examType,
-                                        subjectId = sid,
-                                        date = date,
-                                        time = time,
-                                        session = session,
-                                        location = location.trim(),
-                                        unitIds = selectedUnitIds.toList(),
-                                        grades = selectedGrades.toList(),
-                                        notes = notes.trim()
-                                    )
-                                    dateText = ""; timeText = ""; location = ""; notes = ""
-                                    selectedUnitIds = emptySet(); selectedGrades = emptySet(); error = null
-                                } catch (e: Exception) {
-                                    error = "Date must be YYYY-MM-DD, time must be HH:MM"
-                                }
-                            }
-                        }
-                    }
+                    EBigButton("+ SAVE EXAM") { save() }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -196,70 +333,148 @@ fun ExamScheduleScreen() {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        val upcoming = VoidRepository.upcomingExamSubjects()
+        val upcoming = VoidRepository.upcomingExams()
         if (upcoming.isEmpty()) {
             item { Text("No upcoming exams.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
         }
 
-        items(upcoming) { es -> ExamSubjectRow(es); Spacer(modifier = Modifier.height(8.dp)) }
+        items(upcoming, key = { it.id }) { exam ->
+            ExamGroupCard(
+                exam = exam,
+                onDeleteExam = { VoidRepository.deleteExam(exam.id) },
+                onDeleteSubject = { es -> VoidRepository.deleteExamSubject(es.id) }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         item { Spacer(modifier = Modifier.height(90.dp)) }
     }
 }
 
+// ---------------------------------------------------------------------
+// SHARED GROUPED EXAM CARD — one Exam (Test/Mid/Final/Mock), every
+// subject sitting inside it, grouped by date. Used here in the full
+// "Upcoming Exams" list (with delete affordances) AND on the Home
+// screen's "Next Exam" card (read-only, no delete callbacks passed).
+// ---------------------------------------------------------------------
+
 @Composable
-private fun ExamSubjectRow(es: ExamSubject) {
-    val exam = VoidRepository.examFor(es)
-    val status = es.status()
-    val urgent = es.isUrgent()
+fun ExamGroupCard(
+    exam: Exam,
+    onDeleteExam: (() -> Unit)? = null,
+    onDeleteSubject: ((ExamSubject) -> Unit)? = null
+) {
+    val subjects = exam.subjectsSorted()
+    val nearest = exam.nearestUpcomingSubject()
+    val urgent = subjects.any { it.isUrgent() }
+    val byDate = subjects.groupBy { it.date }.toSortedMap()
 
     EVoidCard(borderColor = if (urgent) VoidColors.Warning else VoidColors.Border) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${exam.examType.name} EXAM",
+                color = VoidColors.Accent,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            if (nearest != null) {
                 Text(
-                    text = "${exam?.examType?.name ?: ""} EXAM",
-                    color = VoidColors.TextSecondary,
-                    fontSize = 9.sp,
+                    text = nearest.status().label(nearest.daysRemaining()),
+                    color = examCountdownColor(nearest.status(), nearest.daysRemaining()),
+                    fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 )
-                Text(VoidRepository.subjectName(es.subjectId), color = VoidColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+            if (onDeleteExam != null) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete exam",
+                    tint = VoidColors.TextSecondary,
+                    modifier = Modifier.clickable { onDeleteExam() }.padding(start = 10.dp).height(16.dp)
+                )
+            }
+        }
+
+        if (exam.startDate != null && exam.endDate != null) {
+            Text(
+                text = "PERIOD: ${exam.startDate} \u2192 ${exam.endDate}",
+                color = VoidColors.TextSecondary,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        byDate.forEach { (date, subjectsOnDate) ->
+            val names = subjectsOnDate.joinToString(", ") { VoidRepository.subjectName(it.subjectId) }
+            Text(
+                text = "${date.dayOfWeek.name} \u00b7 $date",
+                color = VoidColors.TextSecondary,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(names, color = VoidColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+
+            subjectsOnDate.forEach { es ->
+                val detail = buildString {
+                    if (es.time != null) append("Starts ${es.time}")
+                    if (es.session != null) {
+                        if (isNotEmpty()) append(" \u00b7 ")
+                        append(es.session.name)
+                    }
+                    if (es.unitIds.isNotEmpty()) {
+                        if (isNotEmpty()) append(" \u00b7 ")
+                        append("${es.unitIds.size} unit(s)")
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = if (detail.isNotEmpty()) "${VoidRepository.subjectName(es.subjectId)}: $detail" else VoidRepository.subjectName(es.subjectId),
+                        color = VoidColors.TextSecondary,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (onDeleteSubject != null) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Remove ${VoidRepository.subjectName(es.subjectId)} from this exam",
+                            tint = VoidColors.TextSecondary,
+                            modifier = Modifier.clickable { onDeleteSubject(es) }.height(14.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        if (exam.examType == ExamType.MOCK) {
+            if (exam.grades.isNotEmpty()) {
                 Text(
-                    text = buildString {
-                        append(es.date.toString())
-                        if (es.time != null) append(" \u00b7 ${es.time}")
-                        if (es.session != null) append(" \u00b7 ${es.session.name}")
-                        if (es.unitIds.isNotEmpty()) append(" \u00b7 ${es.unitIds.size} units")
-                    },
+                    text = "GRADES COVERED: ${exam.grades.sorted().joinToString(", ") { "G$it" }}",
                     color = VoidColors.TextSecondary,
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = status.label(es.daysRemaining()),
-                    color = examCountdownColor(status, es.daysRemaining()),
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = VoidColors.TextSecondary,
-                    modifier = Modifier
-                        .clickable { exam?.let { VoidRepository.deleteExam(it.id) } }
-                        .padding(top = 6.dp)
-                        .height(16.dp)
-                )
-            }
+            val unitCount = exam.allUnitIds().size
+            Text(
+                text = "SUBJECTS: ${subjects.map { it.subjectId }.distinct().size}${if (unitCount > 0) "  \u00b7  UNITS COVERED: $unitCount" else ""}",
+                color = VoidColors.TextSecondary,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }
 
 // ---------------------------------------------------------------------
-// DROPDOWNS + SHARED
+// DROPDOWNS + SHARED FIELDS
 // ---------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -267,15 +482,6 @@ private fun ExamSubjectRow(es: ExamSubject) {
 private fun EExamTypeDropdown(selected: ExamType, onSelected: (ExamType) -> Unit) {
     EDropdownBase(label = "${selected.name} EXAM") { close ->
         ExamType.entries.forEach { t -> DropdownMenuItem(text = { Text("${t.name} EXAM") }, onClick = { onSelected(t); close() }) }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ESubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
-    val name = VoidRepository.subjects.find { it.id == selectedId }?.name ?: "Select subject"
-    EDropdownBase(label = name) { close ->
-        VoidRepository.subjects.forEach { s -> DropdownMenuItem(text = { Text(s.name) }, onClick = { onSelected(s.id); close() }) }
     }
 }
 
@@ -331,6 +537,80 @@ private fun EField(value: String, onValueChange: (String) -> Unit, label: String
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = VoidColors.TextPrimary),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = VoidColors.Accent,
+            unfocusedBorderColor = VoidColors.Border,
+            focusedLabelColor = VoidColors.Accent,
+            unfocusedLabelColor = VoidColors.TextSecondary,
+            cursorColor = VoidColors.Accent,
+            focusedTextColor = VoidColors.TextPrimary,
+            unfocusedTextColor = VoidColors.TextPrimary
+        )
+    )
+}
+
+/**
+ * Date field that types like a plain number pad: digits go in, hyphens
+ * appear on their own as "YYYY-MM-DD" fills in. Typing "20261012" becomes
+ * "2026-10-12" without the user ever having to find the hyphen key.
+ */
+@Composable
+private fun EDateField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(8)
+            val formatted = buildString {
+                for (i in digits.indices) {
+                    append(digits[i])
+                    if (i == 3 || i == 5) append('-')
+                }
+            }
+            onValueChange(formatted)
+        },
+        label = { Text(label, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+        placeholder = { Text("0000-00-00", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = VoidColors.TextSecondary) },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = VoidColors.TextPrimary),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = VoidColors.Accent,
+            unfocusedBorderColor = VoidColors.Border,
+            focusedLabelColor = VoidColors.Accent,
+            unfocusedLabelColor = VoidColors.TextSecondary,
+            cursorColor = VoidColors.Accent,
+            focusedTextColor = VoidColors.TextPrimary,
+            unfocusedTextColor = VoidColors.TextPrimary
+        )
+    )
+}
+
+/**
+ * Time field that types like a plain number pad: digits go in, the colon
+ * appears on its own as "HH:MM" fills in. Typing "0930" becomes "09:30"
+ * without the user ever having to find the colon key.
+ */
+@Composable
+private fun ETimeField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(4)
+            val formatted = buildString {
+                for (i in digits.indices) {
+                    append(digits[i])
+                    if (i == 1) append(':')
+                }
+            }
+            onValueChange(formatted)
+        },
+        label = { Text(label, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+        placeholder = { Text("00:00", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = VoidColors.TextSecondary) },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = VoidColors.TextPrimary),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = VoidColors.Accent,

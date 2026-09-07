@@ -104,21 +104,29 @@ fun NightAvailabilityEntity.toModel() = NightAvailability(
 // Exam
 // ---------------------------------------------------------------------
 
-fun Exam.toEntity() = ExamEntity(id = id, examType = examType.name, notes = notes)
+fun Exam.toEntity() = ExamEntity(
+    id = id, examType = examType.name, notes = notes,
+    startDate = startDate?.toEpochDay(), endDate = endDate?.toEpochDay(),
+    grades = grades.joinToString(",")
+)
 
-fun ExamEntity.toModel() = Exam(id = id, examType = ExamType.valueOf(examType), notes = notes)
+fun ExamEntity.toModel() = Exam(
+    id = id, examType = ExamType.valueOf(examType), notes = notes,
+    startDate = startDate?.let { LocalDate.ofEpochDay(it) },
+    endDate = endDate?.let { LocalDate.ofEpochDay(it) },
+    grades = if (grades.isBlank()) emptyList() else grades.split(",").map { it.toInt() }
+)
 
 fun ExamSubject.toEntity() = ExamSubjectEntity(
     id = id, examId = examId, subjectId = subjectId, date = date.toEpochDay(),
     time = time?.toString(), session = session?.name, location = location,
-    unitIds = unitIds.joinToString(","), grades = grades.joinToString(",")
+    unitIds = unitIds.joinToString(",")
 )
 
 fun ExamSubjectEntity.toModel() = ExamSubject(
     id = id, examId = examId, subjectId = subjectId, date = LocalDate.ofEpochDay(date),
     time = time?.let { LocalTime.parse(it) }, session = session?.let { ExamSession.valueOf(it) }, location = location,
-    unitIds = if (unitIds.isBlank()) emptyList() else unitIds.split(","),
-    grades = if (grades.isBlank()) emptyList() else grades.split(",").map { it.toInt() }
+    unitIds = if (unitIds.isBlank()) emptyList() else unitIds.split(",")
 )
 
 // ---------------------------------------------------------------------

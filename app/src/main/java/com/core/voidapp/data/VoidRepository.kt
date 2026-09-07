@@ -231,10 +231,12 @@ object VoidRepository {
         circlePlans.filter { it.day == day }
 
     /**
-     * Registers a full exam sitting in one step: creates the parent Exam
-     * (type + notes) and its ExamSubject (date/time/session/units/grades)
-     * together. Multiple sittings can later share one Exam by calling this
-     * again with the same examId if that grouping UI gets built.
+     * Registers a new exam sitting, creating a fresh Exam (type + period +
+     * grades) and its first ExamSubject in one step. To add more subjects
+     * under the SAME exam (e.g. Physics also sitting the same Final),
+     * call addExamSubject with the returned Exam's id instead of calling
+     * this again — that's what keeps multiple subjects grouped into one
+     * exam rather than spawning a separate exam per subject.
      */
     fun registerExam(
         examType: ExamType,
@@ -245,22 +247,29 @@ object VoidRepository {
         location: String = "",
         unitIds: List<String> = emptyList(),
         grades: List<Int> = emptyList(),
-        notes: String = ""
+        notes: String = "",
+        startDate: java.time.LocalDate? = null,
+        endDate: java.time.LocalDate? = null
     ): ExamSubject {
-        val exam = Exam(id = newId(), examType = examType, notes = notes)
+        val exam = Exam(id = newId(), examType = examType, notes = notes, startDate = startDate, endDate = endDate, grades = grades)
         exams.add(exam)
         ioScope.launch { database?.examDao()?.upsert(exam.toEntity()) }
+        return addExamSubject(exam.id, subjectId, date, time, session, location, unitIds)
+    }
 
+    /** Adds another subject's sitting under an existing Exam — what groups "Math Monday, Physics Tuesday" into one Final Exam card instead of two separate exams. */
+    fun addExamSubject(
+        examId: String,
+        subjectId: String,
+        date: java.time.LocalDate,
+        time: java.time.LocalTime?,
+        session: ExamSession?,
+        location: String = "",
+        unitIds: List<String> = emptyList()
+    ): ExamSubject {
         val examSubject = ExamSubject(
-            id = newId(),
-            examId = exam.id,
-            subjectId = subjectId,
-            date = date,
-            time = time,
-            session = session,
-            location = location,
-            unitIds = unitIds,
-            grades = grades
+            id = newId(), examId = examId, subjectId = subjectId, date = date,
+            time = time, session = session, location = location, unitIds = unitIds
         )
         examSubjects.add(examSubject)
         ioScope.launch { database?.examSubjectDao()?.upsert(examSubject.toEntity()) }
@@ -276,12 +285,29 @@ object VoidRepository {
         }
     }
 
+    /** Removes one subject's sitting from an exam; if that was the last subject in it, the now-empty exam is removed too. */
+    fun deleteExamSubject(examSubjectId: String) {
+        val target = examSubjects.find { it.id == examSubjectId } ?: return
+        examSubjects.removeAll { it.id == examSubjectId }
+        ioScope.launch { database?.examSubjectDao()?.deleteById(examSubjectId) }
+        if (examSubjects.none { it.examId == target.examId }) {
+            deleteExam(target.examId)
+        }
+    }
+
     fun examFor(examSubject: ExamSubject): Exam? = exams.find { it.id == examSubject.examId }
 
     fun upcomingExamSubjects(): List<ExamSubject> =
         examSubjects.filter { it.status() != ExamSittingStatus.COMPLETED }.sortedBy { it.date }
 
     fun nearestExamSubject(): ExamSubject? = upcomingExamSubjects().firstOrNull()
+
+    /** Every Exam with at least one sitting still ahead, grouped (not flattened per-subject) — what the Home "Next Exam" card and the Exam Schedule list iterate over. */
+    fun upcomingExams(): List<Exam> =
+        exams.filter { exam -> !exam.isFullyCompleted() && exam.subjectsSorted().isNotEmpty() }
+            .sortedBy { exam -> exam.nearestUpcomingSubject()?.date ?: java.time.LocalDate.MAX }
+
+    fun nearestExam(): Exam? = upcomingExams().firstOrNull()
 
     /** Any Mid/Final/Mock sitting in the automatic 16-20 day Urgent Plan window. */
     fun urgentExamSubjects(): List<ExamSubject> =

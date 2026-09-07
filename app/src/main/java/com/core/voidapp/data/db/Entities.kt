@@ -62,15 +62,18 @@ data class NightAvailabilityEntity(
     val endTime: String?
 )
 
-/** The exam event itself — thin, since date/time/subject specifics live on ExamSubjectEntity. */
+/** The exam event itself — thin, since date/time/subject specifics live on ExamSubjectEntity. startDate/endDate are the overall period for MID/FINAL/MOCK (null for TEST); grades is comma-joined, meaningful mainly for MOCK. */
 @Entity(tableName = "exams")
 data class ExamEntity(
     @PrimaryKey val id: String,
     val examType: String,
-    val notes: String
+    val notes: String,
+    val startDate: Long?,
+    val endDate: Long?,
+    val grades: String
 )
 
-/** One subject's sitting within an exam — its own date/time/session/units/grades. */
+/** One subject's sitting within an exam — its own date/time/session/units. */
 @Entity(tableName = "exam_subjects")
 data class ExamSubjectEntity(
     @PrimaryKey val id: String,
@@ -80,8 +83,7 @@ data class ExamSubjectEntity(
     val time: String?,
     val session: String?,
     val location: String,
-    val unitIds: String,
-    val grades: String
+    val unitIds: String
 )
 
 @Entity(tableName = "circle_plans")
