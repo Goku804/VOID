@@ -152,6 +152,7 @@ fun CirclePlanEntity.toModel() = CirclePlan(
 fun TemporaryTask.toEntity() = TemporaryTaskEntity(
     id = id, title = title, type = type.name, subjectId = subjectId,
     startDate = startDate?.toEpochDay(), deadline = deadline.toEpochDay(),
+    startTimeSec = startTime?.toSecondOfDay(), endTimeSec = endTime?.toSecondOfDay(),
     requiredMinutes = requiredMinutes, completedMinutes = completedMinutes,
     priority = priority.name, unitIds = unitIds.joinToString(","), notes = notes, status = status.name
 )
@@ -159,6 +160,8 @@ fun TemporaryTask.toEntity() = TemporaryTaskEntity(
 fun TemporaryTaskEntity.toModel() = TemporaryTask(
     id = id, title = title, type = TemporaryPlanType.valueOf(type), subjectId = subjectId,
     startDate = startDate?.let { LocalDate.ofEpochDay(it) }, deadline = LocalDate.ofEpochDay(deadline),
+    startTime = startTimeSec?.let { LocalTime.ofSecondOfDay(it.toLong()) },
+    endTime = endTimeSec?.let { LocalTime.ofSecondOfDay(it.toLong()) },
     requiredMinutes = requiredMinutes, completedMinutes = completedMinutes,
     priority = PlanPriority.valueOf(priority),
     unitIds = if (unitIds.isBlank()) emptyList() else unitIds.split(","),

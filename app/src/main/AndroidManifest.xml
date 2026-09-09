@@ -3,6 +3,16 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- VOID Smart Widgets: Floating AI Orb overlay -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- VOID Smart Widgets: precise boundary refresh (class end, midnight, task deadline) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <application
         android:name=".VoidApplication"
         android:allowBackup="true"
@@ -22,6 +32,66 @@
             </intent-filter>
 
         </activity>
+
+        <!-- VOID Smart Widgets — 3 independent Glance home-screen widgets -->
+
+        <receiver
+            android:name=".widgets.glance.TodayClassesWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_classes_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.glance.TodayCirclePlanWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_circleplan_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.glance.TemporaryPlansWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/temporary_plans_widget_info" />
+        </receiver>
+
+        <!-- VOID Smart Widgets — precise refresh timing -->
+
+        <receiver
+            android:name=".widgets.glance.WidgetAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".widgets.glance.WidgetBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- VOID Smart Widgets — Floating AI Orb overlay -->
+
+        <service
+            android:name=".widgets.orb.FloatingOrbService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_ai_overlay" />
+        </service>
 
     </application>
 

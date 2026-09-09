@@ -53,7 +53,9 @@ import com.core.voidapp.data.VoidRepository
 import com.core.voidapp.data.daysUntilDeadline
 import com.core.voidapp.data.isOverdue
 import com.core.voidapp.data.progressPercent
+import com.core.voidapp.data.timeRangeLabel
 import java.time.LocalDate
+import java.time.LocalTime
 
 @Composable
 fun TemporaryPlanContent() {
@@ -61,6 +63,8 @@ fun TemporaryPlanContent() {
     var type by remember { mutableStateOf(TemporaryPlanType.OTHER) }
     var subjectId by remember { mutableStateOf<String?>(null) }
     var deadlineText by remember { mutableStateOf("") }
+    var startTimeText by remember { mutableStateOf("") }
+    var endTimeText by remember { mutableStateOf("") }
     var requiredMinutes by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf(PlanPriority.NORMAL) }
     var notes by remember { mutableStateOf("") }
@@ -84,6 +88,12 @@ fun TemporaryPlanContent() {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TField(value = deadlineText, onValueChange = { deadlineText = it }, label = "Deadline (YYYY-MM-DD)", modifier = Modifier.weight(1f))
                     TField(value = requiredMinutes, onValueChange = { requiredMinutes = it }, label = "Required min", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TField(value = startTimeText, onValueChange = { startTimeText = it }, label = "Start time (opt, HH:MM)", modifier = Modifier.weight(1f))
+                    TField(value = endTimeText, onValueChange = { endTimeText = it }, label = "End time (opt, HH:MM)", modifier = Modifier.weight(1f))
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -131,6 +141,8 @@ fun TemporaryPlanContent() {
                         else -> {
                             try {
                                 val deadline = LocalDate.parse(deadlineText.trim())
+                                val startTime = startTimeText.trim().takeIf { it.isNotBlank() }?.let { LocalTime.parse(it) }
+                                val endTime = endTimeText.trim().takeIf { it.isNotBlank() }?.let { LocalTime.parse(it) }
                                 VoidRepository.addTemporaryTask(
                                     title = title.trim(),
                                     type = type,
@@ -140,12 +152,15 @@ fun TemporaryPlanContent() {
                                     requiredMinutes = minutes,
                                     priority = priority,
                                     unitIds = selectedUnitIds.toList(),
-                                    notes = notes.trim()
+                                    notes = notes.trim(),
+                                    startTime = startTime,
+                                    endTime = endTime
                                 )
                                 title = ""; requiredMinutes = ""; deadlineText = ""; notes = ""; selectedUnitIds = emptySet()
+                                startTimeText = ""; endTimeText = ""
                                 error = null
                             } catch (e: Exception) {
-                                error = "Deadline must be YYYY-MM-DD"
+                                error = "Deadline must be YYYY-MM-DD, time must be HH:MM"
                             }
                         }
                     }
@@ -191,7 +206,8 @@ private fun TemporaryTaskRow(task: TemporaryTask) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(task.title, color = VoidColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "${task.type.name.replace('_', ' ')} \u00b7 ${VoidRepository.subjectName(task.subjectId)}",
+                    text = "${task.type.name.replace('_', ' ')} \u00b7 ${VoidRepository.subjectName(task.subjectId)}" +
+                        (task.timeRangeLabel()?.let { " \u00b7 $it" } ?: ""),
                     color = VoidColors.TextSecondary,
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace

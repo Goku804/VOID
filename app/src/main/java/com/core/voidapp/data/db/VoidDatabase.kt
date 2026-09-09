@@ -19,7 +19,7 @@ import androidx.room.RoomDatabase
         ChatConversationEntity::class,
         ChatMessageEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class VoidDatabase : RoomDatabase() {

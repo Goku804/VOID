@@ -41,6 +41,7 @@ object VoidRepository {
     val chatMessages = mutableStateListOf<ChatMessage>()
 
     private var database: VoidDatabase? = null
+    private var appContext: Context? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     /**
@@ -53,6 +54,7 @@ object VoidRepository {
         if (database != null) return
         val db = VoidDatabase.getInstance(context)
         database = db
+        appContext = context.applicationContext
 
         runBlocking(Dispatchers.IO) {
             val subjectEntities = db.subjectDao().getAll()
@@ -80,6 +82,16 @@ object VoidRepository {
     }
 
     fun newId(): String = UUID.randomUUID().toString()
+
+    /**
+     * Pings VOID Smart Widgets (the 3 home-screen widgets) to recompute
+     * and redraw from current state. Cheap no-op if no widget of that kind
+     * is actually placed, and a no-op entirely before init() has run.
+     * Never called for chat/AI mutations — only for data the widgets read.
+     */
+    private fun notifyWidgets() {
+        appContext?.let { com.core.voidapp.widgets.glance.WidgetUpdateScheduler.refreshAll(it) }
+    }
 
     fun addSubject(name: String, grade: Int, code: String = ""): Subject {
         val subject = Subject(id = newId(), name = name, grade = grade, code = code)
@@ -193,6 +205,7 @@ object VoidRepository {
             examSubjectIds.forEach { database?.examSubjectDao()?.deleteById(it) }
             emptiedExamIds.forEach { database?.examDao()?.deleteById(it) }
         }
+        notifyWidgets()
     }
 
     /** Edits an existing unit. Any parameter left null keeps its current value. */
@@ -273,11 +286,13 @@ object VoidRepository {
         )
         classPeriods.add(period)
         ioScope.launch { database?.classPeriodDao()?.upsert(period.toEntity()) }
+        notifyWidgets()
     }
 
     fun deleteClassPeriod(periodId: String) {
         classPeriods.removeAll { it.id == periodId }
         ioScope.launch { database?.classPeriodDao()?.deleteById(periodId) }
+        notifyWidgets()
     }
 
     fun scheduleFor(day: DayOfWeekVoid): List<ClassPeriod> =
@@ -318,12 +333,14 @@ object VoidRepository {
         )
         circlePlans.add(plan)
         ioScope.launch { database?.circlePlanDao()?.upsert(plan.toEntity()) }
+        notifyWidgets()
         return plan
     }
 
     fun deleteCirclePlan(planId: String) {
         circlePlans.removeAll { it.id == planId }
         ioScope.launch { database?.circlePlanDao()?.deleteById(planId) }
+        notifyWidgets()
     }
 
     /** Manually step the CONTINUE_NEXT_UNIT cursor forward (+1) or back (-1). Wraps around. */
@@ -337,6 +354,7 @@ object VoidRepository {
         val updated = plan.copy(currentUnitIndex = newIndex)
         circlePlans[idx] = updated
         ioScope.launch { database?.circlePlanDao()?.upsert(updated.toEntity()) }
+        notifyWidgets()
     }
 
     fun circlePlansFor(day: DayOfWeekVoid): List<CirclePlan> =
@@ -437,7 +455,9 @@ object VoidRepository {
         requiredMinutes: Int,
         priority: PlanPriority,
         unitIds: List<String> = emptyList(),
-        notes: String = ""
+        notes: String = "",
+        startTime: java.time.LocalTime? = null,
+        endTime: java.time.LocalTime? = null
     ): TemporaryTask {
         val task = TemporaryTask(
             id = newId(),
@@ -446,6 +466,8 @@ object VoidRepository {
             subjectId = subjectId,
             startDate = startDate,
             deadline = deadline,
+            startTime = startTime,
+            endTime = endTime,
             requiredMinutes = requiredMinutes,
             priority = priority,
             unitIds = unitIds,
@@ -453,7 +475,18 @@ object VoidRepository {
         )
         temporaryTasks.add(task)
         ioScope.launch { database?.temporaryTaskDao()?.upsert(task.toEntity()) }
+        notifyWidgets()
         return task
+    }
+
+    /** Edits the optional clock-time window on an existing task (e.g. attaching "18:00 -> 19:30" after creation). Pass null to clear either side. */
+    fun updateTaskSchedule(taskId: String, startTime: java.time.LocalTime?, endTime: java.time.LocalTime?) {
+        val idx = temporaryTasks.indexOfFirst { it.id == taskId }
+        if (idx == -1) return
+        val updated = temporaryTasks[idx].copy(startTime = startTime, endTime = endTime)
+        temporaryTasks[idx] = updated
+        ioScope.launch { database?.temporaryTaskDao()?.upsert(updated.toEntity()) }
+        notifyWidgets()
     }
 
     fun addProgress(taskId: String, minutes: Int) {
@@ -469,6 +502,7 @@ object VoidRepository {
         val updated = task.copy(completedMinutes = newCompleted, status = newStatus)
         temporaryTasks[idx] = updated
         ioScope.launch { database?.temporaryTaskDao()?.upsert(updated.toEntity()) }
+        notifyWidgets()
     }
 
     fun setTaskStatus(taskId: String, status: PlanTaskStatus) {
@@ -477,11 +511,13 @@ object VoidRepository {
         val updated = temporaryTasks[idx].copy(status = status)
         temporaryTasks[idx] = updated
         ioScope.launch { database?.temporaryTaskDao()?.upsert(updated.toEntity()) }
+        notifyWidgets()
     }
 
     fun deleteTemporaryTask(taskId: String) {
         temporaryTasks.removeAll { it.id == taskId }
         ioScope.launch { database?.temporaryTaskDao()?.deleteById(taskId) }
+        notifyWidgets()
     }
 
     fun activeTemporaryTasks(): List<TemporaryTask> =

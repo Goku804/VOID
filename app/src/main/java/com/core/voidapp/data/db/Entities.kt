@@ -108,6 +108,8 @@ data class TemporaryTaskEntity(
     val subjectId: String?,
     val startDate: Long?,
     val deadline: Long,
+    val startTimeSec: Int?,
+    val endTimeSec: Int?,
     val requiredMinutes: Int,
     val completedMinutes: Int,
     val priority: String,

@@ -236,6 +236,11 @@ enum class PlanTaskStatus { PLANNED, IN_PROGRESS, COMPLETED, PARTIAL, MISSED, CA
 /**
  * Short-term interruption or addition — never deletes a Circle Plan slot,
  * the (future) Priority Engine reschedules the Circle Plan around it instead.
+ *
+ * startTime/endTime are optional, independent of startDate/deadline: a task
+ * can be date-scoped only ("due 2026-09-12") or additionally clock-scoped
+ * ("18:00 -> 19:30" that same day) — VOID Smart Widgets shows the clock
+ * range when both are set, and the plain date otherwise.
  */
 data class TemporaryTask(
     val id: String,
@@ -244,6 +249,8 @@ data class TemporaryTask(
     val subjectId: String? = null,
     val startDate: LocalDate? = null,
     val deadline: LocalDate,
+    val startTime: LocalTime? = null,
+    val endTime: LocalTime? = null,
     val requiredMinutes: Int = 0,
     val completedMinutes: Int = 0,
     val priority: PlanPriority = PlanPriority.NORMAL,
@@ -261,6 +268,31 @@ fun TemporaryTask.progressPercent(): Int =
 
 fun TemporaryTask.isOverdue(): Boolean =
     status != PlanTaskStatus.COMPLETED && status != PlanTaskStatus.CANCELLED && daysUntilDeadline() < 0
+
+/** "18:00 -> 19:30" when both clock times are set, "18:00" with only a start, or null when the task is date-only. */
+fun TemporaryTask.timeRangeLabel(): String? = when {
+    startTime != null && endTime != null -> "$startTime \u2192 $endTime"
+    startTime != null -> startTime.toString()
+    else -> null
+}
+
+/**
+ * Whether this task is "live" at the given moment for widget purposes —
+ * the single place that decides it, so no widget or screen reimplements
+ * this check differently. Not completed/cancelled, not before its start
+ * date, and not past its deadline (clock-aware when startTime/endTime are
+ * set; otherwise the whole deadline day counts).
+ */
+fun TemporaryTask.isActiveAt(now: java.time.LocalDateTime): Boolean {
+    if (status == PlanTaskStatus.COMPLETED || status == PlanTaskStatus.CANCELLED) return false
+    val today = now.toLocalDate()
+    if (startDate != null && today.isBefore(startDate)) return false
+    if (today.isAfter(deadline)) return false
+    if (today.isBefore(deadline)) return true
+    // Today IS the deadline day — clock-aware cutoff when an end time was set.
+    val cutoff = endTime ?: java.time.LocalTime.MAX
+    return !now.toLocalTime().isAfter(cutoff)
+}
 
 /**
  * Computes weighted total (0-100 scale) for a subject from whatever

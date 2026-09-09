@@ -49,5 +49,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
 
+    // VOID Smart Widgets — Glance for the 3 home-screen widgets, WorkManager
+    // as the periodic safety-net refresh behind the exact-alarm scheduler.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }
