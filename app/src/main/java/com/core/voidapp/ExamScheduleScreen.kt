@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,10 +66,14 @@ import java.time.LocalTime
  * several days — its own date/time/session inside the overall period.
  * For TEST these date/time/session fields go unused; the shared fields
  * above the subject list apply to every subject instead.
+ *
+ * `date` is a real LocalDate, not free text: it's only ever set by
+ * picking one of the days generated from the exam period below, so there
+ * is nothing here left to parse or mistype.
  */
 private data class SubjectExamDraft(
     val unitIds: Set<String> = emptySet(),
-    val dateText: String = "",
+    val date: LocalDate? = null,
     val timeText: String = "",
     val session: ExamSession? = null
 )
@@ -94,6 +99,32 @@ fun ExamScheduleScreen() {
     var location by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // Every calendar date inclusive of the exam period, recalculated only
+    // when the start/end text actually changes. Empty (and thus "no valid
+    // period yet") whenever either field is blank, unparsable, or the
+    // range is backwards.
+    val periodDates = remember(startDateText, endDateText) {
+        val start = startDateText.trim().let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val end = endDateText.trim().let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        if (start != null && end != null && !end.isBefore(start)) {
+            generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.toList()
+        } else {
+            emptyList()
+        }
+    }
+
+    // Error handling: if the period is redefined and a subject's already-
+    // picked date no longer falls inside it, clear that selection instead
+    // of silently keeping a now-invalid date attached to the subject.
+    LaunchedEffect(periodDates) {
+        if (examType != ExamType.TEST && subjectDrafts.values.any { it.date != null && it.date !in periodDates }) {
+            val validDates = periodDates.toSet()
+            subjectDrafts = subjectDrafts.mapValues { (_, d) ->
+                if (d.date != null && d.date !in validDates) d.copy(date = null) else d
+            }
+        }
+    }
 
     fun toggleSubject(subjectId: String) {
         subjectDrafts = if (subjectDrafts.containsKey(subjectId)) {
@@ -151,15 +182,15 @@ fun ExamScheduleScreen() {
                     error = "Enter a start and end date for the exam period"
                     return
                 }
-                if (subjectDrafts.values.any { it.dateText.isBlank() }) {
-                    error = "Set a date for every selected subject"
+                if (subjectDrafts.values.any { it.date == null }) {
+                    error = "Pick a date for every selected subject"
                     return
                 }
                 val startDate = LocalDate.parse(startDateText.trim())
                 val endDate = LocalDate.parse(endDateText.trim())
 
                 subjectDrafts.forEach { (subjectId, draft) ->
-                    val date = LocalDate.parse(draft.dateText.trim())
+                    val date = draft.date!!
                     val time = draft.timeText.trim().takeIf { it.isNotBlank() }?.let { LocalTime.parse(it) }
                     val examId = sharedExamId
                     if (examId == null) {
@@ -220,6 +251,15 @@ fun ExamScheduleScreen() {
                             EDateField(value = startDateText, onValueChange = { startDateText = it }, label = "Start date", modifier = Modifier.weight(1f))
                             EDateField(value = endDateText, onValueChange = { endDateText = it }, label = "End date", modifier = Modifier.weight(1f))
                         }
+                        if (startDateText.isNotBlank() && endDateText.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (periodDates.isNotEmpty()) "${periodDates.size} day(s) in this period" else "End date must be on or after the start date",
+                                color = if (periodDates.isNotEmpty()) VoidColors.TextSecondary else VoidColors.Danger,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -267,20 +307,18 @@ fun ExamScheduleScreen() {
                                     }
 
                                     if (examType != ExamType.TEST) {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            EDateField(
-                                                value = draft.dateText,
-                                                onValueChange = { v -> updateDraft(s.id) { d -> d.copy(dateText = v) } },
-                                                label = "${s.name} date",
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            ETimeField(
-                                                value = draft.timeText,
-                                                onValueChange = { v -> updateDraft(s.id) { d -> d.copy(timeText = v) } },
-                                                label = "Time (opt)",
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
+                                        EExamPeriodDateDropdown(
+                                            label = "${s.name} date",
+                                            selected = draft.date,
+                                            options = periodDates,
+                                            onSelected = { picked -> updateDraft(s.id) { d -> d.copy(date = picked) } }
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        ETimeField(
+                                            value = draft.timeText,
+                                            onValueChange = { v -> updateDraft(s.id) { d -> d.copy(timeText = v) } },
+                                            label = "Time (opt)"
+                                        )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         ESessionDropdown(selected = draft.session, onSelected = { sel -> updateDraft(s.id) { d -> d.copy(session = sel) } })
                                     }
@@ -492,6 +530,38 @@ private fun ESessionDropdown(selected: ExamSession?, onSelected: (ExamSession?) 
         DropdownMenuItem(text = { Text("None") }, onClick = { onSelected(null); close() })
         ExamSession.entries.forEach { s -> DropdownMenuItem(text = { Text(s.name) }, onClick = { onSelected(s); close() }) }
     }
+}
+
+/**
+ * Replaces manual per-subject date entry: options are only the calendar
+ * days that actually fall inside the exam period above, each labeled with
+ * its day name so there's no need to cross-check a calendar by hand — a
+ * subject can only ever be scheduled on a day that's genuinely inside the
+ * registered period.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EExamPeriodDateDropdown(
+    label: String,
+    selected: LocalDate?,
+    options: List<LocalDate>,
+    onSelected: (LocalDate) -> Unit
+) {
+    val placeholder = if (options.isEmpty()) "Set exam period above first" else label
+    EDropdownBase(label = selected?.let { formatExamDateOption(it) } ?: placeholder) { close ->
+        if (options.isEmpty()) {
+            DropdownMenuItem(text = { Text("Set the exam period above first", color = VoidColors.TextSecondary) }, onClick = { close() })
+        } else {
+            options.forEach { d ->
+                DropdownMenuItem(text = { Text(formatExamDateOption(d)) }, onClick = { onSelected(d); close() })
+            }
+        }
+    }
+}
+
+private fun formatExamDateOption(date: LocalDate): String {
+    val dayName = date.dayOfWeek.name.lowercase().replaceFirstChar { it.titlecase() }
+    return "$dayName ($date)"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
