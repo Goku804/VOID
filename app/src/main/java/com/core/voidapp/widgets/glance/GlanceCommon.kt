@@ -73,7 +73,7 @@ fun VoidBorderCard(
 }
 
 fun voidMonoStyle(sizeSp: Int, color: Color, bold: Boolean = false): TextStyle = TextStyle(
-    color = ColorProvider(color),
+    color = ColorProvider(day = color, night = color),
     fontSize = sizeSp.sp,
     fontFamily = FontFamily.Monospace,
     fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal
