@@ -9,11 +9,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
@@ -36,7 +37,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
  * AI Chat is deliberately NOT a destination here anymore — it's an
@@ -110,11 +114,22 @@ fun FloatingBottomNav(
  * FloatingBottomNav, in its own corner, with its own tap target. Tapping
  * it opens a full-screen overlay (not a tab swap), so it needs to read as
  * its own thing rather than a fifth item bolted onto the nav row.
+ *
+ * Freely draggable across the whole screen: position is passed in as
+ * [offsetPx] (absolute pixels from the top-left of whatever full-screen
+ * Box hosts it) and reported back via [onDrag] as a delta, so the caller
+ * — VoidApp, sitting above every tab/page — can own the single source of
+ * truth for "where is it right now" and keep it wherever the user last
+ * left it while navigating between HOME/PLAN/EXECUTE/SETTINGS and even
+ * while the AI Chat overlay itself opens and closes. A plain tap (no
+ * movement) still opens the chat; a drag moves it instead of opening it.
  */
 @Composable
 fun FloatingAiButton(
     visible: Boolean,
     onClick: () -> Unit,
+    offsetPx: Offset,
+    onDrag: (Offset) -> Unit,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -125,18 +140,25 @@ fun FloatingAiButton(
     ) {
         Box(
             modifier = Modifier
-                .statusBarsPadding()
-                .padding(16.dp)
+                .offset { IntOffset(offsetPx.x.roundToInt(), offsetPx.y.roundToInt()) }
                 .size(48.dp)
                 .clip(RoundedCornerShape(50))
                 .background(VoidColors.Surface)
                 .border(1.dp, VoidColors.Purple.copy(alpha = 0.5f), RoundedCornerShape(50))
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount)
+                        }
+                    )
+                }
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.AutoAwesome,
-                contentDescription = "Open AI Chat",
+                contentDescription = "Open AI Chat \u2014 drag to move",
                 tint = VoidColors.Purple,
                 modifier = Modifier.size(22.dp)
             )

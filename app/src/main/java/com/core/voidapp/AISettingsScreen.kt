@@ -67,8 +67,10 @@ fun AISettingsScreen() {
     var savedConfig by remember { mutableStateOf(AIConfigStore.load(context)) }
 
     var provider by remember { mutableStateOf(savedConfig?.provider ?: AIProvider.OPENAI) }
-    var editingKey by remember { mutableStateOf(savedConfig == null) }
-    var apiKeyInput by remember { mutableStateOf("") }
+    // The fallback chain being edited — starts from whatever was last saved.
+    // Nothing here is persisted until SAVE is pressed, same as the rest of this screen.
+    var keys by remember { mutableStateOf(savedConfig?.apiKeys ?: emptyList()) }
+    var newKeyInput by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
     var model by remember { mutableStateOf(savedConfig?.model ?: provider.defaultModel) }
     var baseUrl by remember { mutableStateOf(savedConfig?.baseUrl ?: provider.defaultBaseUrl) }
@@ -96,37 +98,57 @@ fun AISettingsScreen() {
         })
 
         Spacer(modifier = Modifier.height(16.dp))
-        VoidSectionLabel("API KEY")
+        VoidSectionLabel("API KEYS")
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Add more than one key to build a fallback chain \u2014 if the first runs out of quota or gets rate-limited, VOID automatically retries with the next one, in order.",
+            color = VoidColors.TextSecondary,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace
+        )
         Spacer(modifier = Modifier.height(8.dp))
-        if (hasSavedKey && !editingKey) {
+
+        if (keys.isEmpty()) {
             VoidCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(VoidColors.Success, Modifier.size(7.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Saved: ${AIConfigStore.maskKey(savedConfig!!.apiKey)}",
-                        color = VoidColors.TextPrimary,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        "REPLACE",
-                        color = VoidColors.Cyan,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.clickable { editingKey = true }.padding(4.dp)
-                    )
-                }
+                Text("No keys added yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
+            Spacer(modifier = Modifier.height(8.dp))
         } else {
+            keys.forEachIndexed { index, key ->
+                VoidCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(if (index == 0) VoidColors.Success else VoidColors.TextSecondary, Modifier.size(7.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "${index + 1}. ${AIConfigStore.maskKey(key)}" + if (index == 0) "  (primary)" else "  (fallback)",
+                            color = VoidColors.TextPrimary,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            "REMOVE",
+                            color = VoidColors.Danger,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.clickable {
+                                keys = keys.toMutableList().also { it.removeAt(index) }
+                            }.padding(4.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
-                value = apiKeyInput,
-                onValueChange = { apiKeyInput = it },
-                modifier = Modifier.fillMaxWidth(),
+                value = newKeyInput,
+                onValueChange = { newKeyInput = it },
+                modifier = Modifier.weight(1f),
                 singleLine = true,
-                placeholder = { Text("Paste API key", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                placeholder = { Text("Paste another API key", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                 visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     Icon(
@@ -142,6 +164,22 @@ fun AISettingsScreen() {
                     unfocusedBorderColor = VoidColors.Border,
                     cursorColor = VoidColors.Cyan
                 )
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "ADD",
+                color = VoidColors.Cyan,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.clickable {
+                    val trimmed = newKeyInput.trim()
+                    if (trimmed.isNotBlank() && trimmed !in keys) {
+                        keys = keys + trimmed
+                        newKeyInput = ""
+                        status = null
+                    }
+                }.padding(8.dp)
             )
         }
 
@@ -162,7 +200,7 @@ fun AISettingsScreen() {
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.clickable(enabled = !loadingModels) {
-                    val key = if (editingKey && apiKeyInput.isNotBlank()) apiKeyInput.trim() else savedConfig?.apiKey.orEmpty()
+                    val key = keys.firstOrNull() ?: newKeyInput.trim()
                     if (key.isBlank()) {
                         status = "Enter an API key first."
                         statusColor = VoidColors.Warning
@@ -222,7 +260,7 @@ fun AISettingsScreen() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Lets VOID AI act directly on your data \u2014 subjects, tasks, exams, Circle Plan slots, and scores \u2014 instead of only reading it. Granted by default; turn off for read-only.",
+                        "Lets VOID AI act directly on your data \u2014 subjects, units, marks, tasks, exams, Circle Plan slots, and scores \u2014 instead of only reading it. Granted by default; turn off for read-only.",
                         color = VoidColors.TextSecondary,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace
@@ -252,21 +290,28 @@ fun AISettingsScreen() {
             Spacer(modifier = Modifier.height(10.dp))
         }
 
-        fun currentKey() = if (editingKey && apiKeyInput.isNotBlank()) apiKeyInput.trim() else savedConfig?.apiKey.orEmpty()
+        /** Whatever's typed in the "add key" field but not yet added counts too, so a forgotten tap on ADD doesn't lose it. */
+        fun pendingKeyChain(): List<String> {
+            val pending = newKeyInput.trim()
+            return (keys + listOfNotNull(pending.takeIf { it.isNotBlank() && it !in keys })).distinct()
+        }
 
         SettingsButton(text = if (testing) "TESTING..." else "TEST CONNECTION", accent = VoidColors.Info, enabled = !testing) {
-            val key = currentKey()
-            if (key.isBlank()) {
-                status = "Enter an API key first."
+            val chain = pendingKeyChain()
+            if (chain.isEmpty()) {
+                status = "Add at least one API key first."
                 statusColor = VoidColors.Warning
                 return@SettingsButton
             }
             testing = true
             status = null
-            val config = AIConfig(provider = provider, apiKey = key, model = model.ifBlank { provider.defaultModel }, baseUrl = baseUrl.ifBlank { provider.defaultBaseUrl })
+            val config = AIConfig(
+                provider = provider, apiKey = chain.first(), apiKeys = chain,
+                model = model.ifBlank { provider.defaultModel }, baseUrl = baseUrl.ifBlank { provider.defaultBaseUrl }
+            )
             scope.launch {
                 when (val result = AIRepository.testConnection(config)) {
-                    is AIResult.Success -> { status = "Connected."; statusColor = VoidColors.Success }
+                    is AIResult.Success -> { status = "Connected (${chain.size} key(s) in chain)."; statusColor = VoidColors.Success }
                     is AIResult.Failure -> { status = result.message; statusColor = VoidColors.Danger }
                 }
                 testing = false
@@ -276,28 +321,31 @@ fun AISettingsScreen() {
         Spacer(modifier = Modifier.height(10.dp))
 
         SettingsButton(text = "SAVE", accent = VoidColors.Success) {
-            val key = currentKey()
-            if (key.isBlank()) {
-                status = "Enter an API key before saving."
+            val chain = pendingKeyChain()
+            if (chain.isEmpty()) {
+                status = "Add at least one API key before saving."
                 statusColor = VoidColors.Warning
                 return@SettingsButton
             }
-            val newConfig = AIConfig(provider = provider, apiKey = key, model = model.ifBlank { provider.defaultModel }, baseUrl = baseUrl.ifBlank { provider.defaultBaseUrl })
+            val newConfig = AIConfig(
+                provider = provider, apiKey = chain.first(), apiKeys = chain,
+                model = model.ifBlank { provider.defaultModel }, baseUrl = baseUrl.ifBlank { provider.defaultBaseUrl }
+            )
             AIConfigStore.save(context, newConfig)
             savedConfig = newConfig
-            editingKey = false
-            apiKeyInput = ""
-            status = "Saved."
+            keys = chain
+            newKeyInput = ""
+            status = "Saved ${chain.size} key(s)."
             statusColor = VoidColors.Success
         }
 
         if (hasSavedKey) {
             Spacer(modifier = Modifier.height(10.dp))
-            SettingsButton(text = "REMOVE SAVED KEY", accent = VoidColors.Danger) {
+            SettingsButton(text = "CLEAR ALL KEYS", accent = VoidColors.Danger) {
                 AIConfigStore.clear(context)
                 savedConfig = null
-                editingKey = true
-                apiKeyInput = ""
+                keys = emptyList()
+                newKeyInput = ""
                 status = "Removed."
                 statusColor = VoidColors.TextSecondary
             }

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,7 +68,20 @@ fun VoidApp() {
             modifier = Modifier.fillMaxSize(),
             color = VoidColors.Background
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val density = LocalDensity.current
+                val buttonSizePx = with(density) { 48.dp.toPx() }
+                val maxOffsetXPx = with(density) { maxWidth.toPx() } - buttonSizePx
+                val maxOffsetYPx = with(density) { maxHeight.toPx() } - buttonSizePx
+
+                // Single source of truth for the AI button's position, owned
+                // here (above every tab/page and above the chat overlay
+                // itself) so it survives navigating between HOME/PLAN/
+                // EXECUTE/SETTINGS and opening/closing the chat — the user
+                // drags it once and it stays put anywhere on screen.
+                var aiButtonOffset by remember {
+                    mutableStateOf(with(density) { Offset(16.dp.toPx(), 64.dp.toPx()) })
+                }
 
                 ParticleField(modifier = Modifier.fillMaxSize())
 
@@ -89,13 +105,21 @@ fun VoidApp() {
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
 
-                // Isolated on purpose — its own corner, its own tap target,
-                // separate from the tab row below. Opens a full-screen
-                // overlay rather than swapping out whatever tab is active.
+                // Isolated on purpose — its own tap target, separate from
+                // the tab row below. Opens a full-screen overlay rather than
+                // swapping out whatever tab is active. Freely draggable
+                // anywhere on screen; position is clamped to stay fully
+                // on-screen no matter where the drag ends.
                 FloatingAiButton(
                     visible = !showAiChat,
                     onClick = { showAiChat = true },
-                    modifier = Modifier.align(Alignment.TopStart)
+                    offsetPx = aiButtonOffset,
+                    onDrag = { delta ->
+                        aiButtonOffset = Offset(
+                            (aiButtonOffset.x + delta.x).coerceIn(0f, maxOffsetXPx.coerceAtLeast(0f)),
+                            (aiButtonOffset.y + delta.y).coerceIn(0f, maxOffsetYPx.coerceAtLeast(0f))
+                        )
+                    }
                 )
 
                 // Full-screen, isolated AI Chat overlay: solid background of

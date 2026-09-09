@@ -142,6 +142,118 @@ object VoidRepository {
         ioScope.launch { database?.assessmentTypeDao()?.upsert(type.toEntity(subjectId)) }
     }
 
+    /** Edits name/grade/code on an existing subject. Any parameter left null keeps its current value. */
+    fun updateSubject(subjectId: String, name: String? = null, grade: Int? = null, code: String? = null): Subject? {
+        val idx = subjects.indexOfFirst { it.id == subjectId }
+        if (idx == -1) return null
+        val current = subjects[idx]
+        val updated = current.copy(
+            name = name ?: current.name,
+            grade = grade ?: current.grade,
+            code = code ?: current.code
+        )
+        subjects[idx] = updated
+        persistSubject(updated)
+        return updated
+    }
+
+    /**
+     * Deletes a subject and everything that only makes sense attached to
+     * it — its marks (assessment types), units, weekly class periods,
+     * Circle Plan slots, and its sittings inside any exam (removing the
+     * exam itself if that was its last remaining subject). Temporary
+     * tasks that referenced it are left alone with a dangling subjectId —
+     * subjectName() already renders that gracefully — since a homework
+     * item shouldn't vanish just because the subject record was removed.
+     */
+    fun deleteSubject(subjectId: String) {
+        val subject = subjects.find { it.id == subjectId } ?: return
+        val assessmentTypeIds = subject.assessmentTypes.map { it.id }
+        val unitIds = units.filter { it.subjectId == subjectId }.map { it.id }
+        val periodIds = classPeriods.filter { it.subjectId == subjectId }.map { it.id }
+        val planIds = circlePlans.filter { it.subjectId == subjectId }.map { it.id }
+        val affectedExamSubjects = examSubjects.filter { it.subjectId == subjectId }
+        val examSubjectIds = affectedExamSubjects.map { it.id }
+        val touchedExamIds = affectedExamSubjects.map { it.examId }.distinct()
+
+        subjects.removeAll { it.id == subjectId }
+        units.removeAll { it.subjectId == subjectId }
+        classPeriods.removeAll { it.subjectId == subjectId }
+        circlePlans.removeAll { it.subjectId == subjectId }
+        examSubjects.removeAll { it.subjectId == subjectId }
+        val emptiedExamIds = touchedExamIds.filter { examId -> examSubjects.none { it.examId == examId } }
+        exams.removeAll { it.id in emptiedExamIds }
+
+        ioScope.launch {
+            database?.subjectDao()?.deleteById(subjectId)
+            assessmentTypeIds.forEach { database?.assessmentTypeDao()?.deleteById(it) }
+            unitIds.forEach { database?.unitDao()?.deleteById(it) }
+            periodIds.forEach { database?.classPeriodDao()?.deleteById(it) }
+            planIds.forEach { database?.circlePlanDao()?.deleteById(it) }
+            examSubjectIds.forEach { database?.examSubjectDao()?.deleteById(it) }
+            emptiedExamIds.forEach { database?.examDao()?.deleteById(it) }
+        }
+    }
+
+    /** Edits an existing unit. Any parameter left null keeps its current value. */
+    fun updateUnit(
+        unitId: String,
+        unitNumber: Int? = null,
+        name: String? = null,
+        description: String? = null,
+        estimatedStudyMinutes: Int? = null
+    ): AcademicUnit? {
+        val idx = units.indexOfFirst { it.id == unitId }
+        if (idx == -1) return null
+        val current = units[idx]
+        val updated = current.copy(
+            unitNumber = unitNumber ?: current.unitNumber,
+            name = name ?: current.name,
+            description = description ?: current.description,
+            estimatedStudyMinutes = estimatedStudyMinutes ?: current.estimatedStudyMinutes
+        )
+        units[idx] = updated
+        ioScope.launch { database?.unitDao()?.upsert(updated.toEntity()) }
+        return updated
+    }
+
+    /** Edits an existing mark's definition (label/weight/max score). The score itself is set separately via recordScore. */
+    fun updateAssessmentType(
+        subjectId: String,
+        assessmentTypeId: String,
+        label: String? = null,
+        weightPercent: Double? = null,
+        maxScore: Double? = null
+    ): AssessmentType? {
+        val subject = subjects.find { it.id == subjectId } ?: return null
+        val idx = subject.assessmentTypes.indexOfFirst { it.id == assessmentTypeId }
+        if (idx == -1) return null
+        val current = subject.assessmentTypes[idx]
+        val updated = current.copy(
+            label = label ?: current.label,
+            weightPercent = weightPercent ?: current.weightPercent,
+            maxScore = maxScore ?: current.maxScore
+        )
+        subject.assessmentTypes[idx] = updated
+        ioScope.launch { database?.assessmentTypeDao()?.upsert(updated.toEntity(subjectId)) }
+        return updated
+    }
+
+    /** Deletes a mark definition entirely — including whatever score was recorded on it. */
+    fun deleteAssessmentType(subjectId: String, assessmentTypeId: String) {
+        val subject = subjects.find { it.id == subjectId } ?: return
+        subject.assessmentTypes.removeAll { it.id == assessmentTypeId }
+        ioScope.launch { database?.assessmentTypeDao()?.deleteById(assessmentTypeId) }
+    }
+
+    /** Clears a recorded score back to ungraded without deleting the mark definition itself. */
+    fun clearScore(subjectId: String, assessmentTypeId: String) {
+        val subject = subjects.find { it.id == subjectId } ?: return
+        val type = subject.assessmentTypes.find { it.id == assessmentTypeId } ?: return
+        type.entry = null
+        ioScope.launch { database?.assessmentTypeDao()?.upsert(type.toEntity(subjectId)) }
+    }
+
     fun addClassPeriod(
         day: DayOfWeekVoid,
         periodNumber: Int,

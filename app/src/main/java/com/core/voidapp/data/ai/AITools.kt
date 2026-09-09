@@ -9,8 +9,11 @@ import com.core.voidapp.data.PlanTaskStatus
 import com.core.voidapp.data.PreferredWindow
 import com.core.voidapp.data.TemporaryPlanType
 import com.core.voidapp.data.VoidRepository
+import com.core.voidapp.data.isFullyGraded
 import com.core.voidapp.data.status
 import com.core.voidapp.data.subjectsSorted
+import com.core.voidapp.data.totalWeight
+import com.core.voidapp.data.weightedTotal
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -47,6 +50,91 @@ object AITools {
                 "code" to str("Optional short code, e.g. MATH"),
                 required = listOf("name", "grade")
             )
+        ),
+        AIToolDef(
+            "update_subject", "Edit an existing subject's name, grade, or code. Matches by exact current subject name. Only fields provided are changed.",
+            obj(
+                "subject_name" to str("Current exact name of the subject to edit"),
+                "new_name" to str("New name, if changing it"),
+                "new_grade" to int_("New grade/year level, if changing it"),
+                "new_code" to str("New short code, if changing it"),
+                required = listOf("subject_name")
+            )
+        ),
+        AIToolDef(
+            "delete_subject",
+            "Permanently delete a subject and everything attached only to it: its units, marks/assessment scores, weekly class periods, Circle Plan slots, and its sittings inside any exam. Matches by exact subject name. Only use when the user clearly asked to remove it — this cannot be undone.",
+            obj("subject_name" to str("Exact name of the subject to delete"), required = listOf("subject_name"))
+        ),
+        AIToolDef(
+            "create_unit", "Create a syllabus unit within a subject (e.g. 'Unit 2 — Functions'), used by Circle Plan to track study progress through the subject.",
+            obj(
+                "subject_name" to str("Subject this unit belongs to — must match an existing subject exactly"),
+                "unit_number" to int_("Ordering number of the unit within the subject, e.g. 2"),
+                "name" to str("Unit name, e.g. 'Functions'"),
+                "description" to str("Optional short description"),
+                "estimated_minutes" to int_("Optional estimated study minutes to complete this unit, 0 if unknown"),
+                required = listOf("subject_name", "unit_number", "name")
+            )
+        ),
+        AIToolDef(
+            "update_unit", "Edit an existing unit's number, name, description, or estimated study minutes. Matches by subject name and current unit name. Only fields provided are changed.",
+            obj(
+                "subject_name" to str("Subject the unit belongs to"),
+                "unit_name" to str("Current exact name of the unit to edit"),
+                "new_unit_number" to int_("New ordering number, if changing it"),
+                "new_name" to str("New unit name, if changing it"),
+                "new_description" to str("New description, if changing it"),
+                "new_estimated_minutes" to int_("New estimated study minutes, if changing it"),
+                required = listOf("subject_name", "unit_name")
+            )
+        ),
+        AIToolDef(
+            "delete_unit", "Permanently delete a unit. Matches by subject name and unit name. Only use when the user clearly asked to remove it.",
+            obj(
+                "subject_name" to str("Subject the unit belongs to"),
+                "unit_name" to str("Exact name of the unit to delete"),
+                required = listOf("subject_name", "unit_name")
+            )
+        ),
+        AIToolDef(
+            "list_units", "List every unit registered under a subject, in order, with study-progress read access for analysis.",
+            obj("subject_name" to str("Subject to list units for"), required = listOf("subject_name"))
+        ),
+        AIToolDef(
+            "create_mark", "Create a new gradable mark (assessment) on a subject, e.g. 'Chapter 3 Test' worth 20% out of 100 — the score itself is set afterward with record_score.",
+            obj(
+                "subject_name" to str("Subject this mark belongs to — must match an existing subject exactly"),
+                "kind" to str("Assessment kind", enum = listOf("TEST", "ASSIGNMENT", "MID_EXAM", "FINAL_EXAM", "MOCK_EXAM", "QUIZ", "OTHER")),
+                "label" to str("Display label, e.g. 'Chapter 3 Test'"),
+                "weight_percent" to num("Weight of this mark toward the subject's total, e.g. 20"),
+                "max_score" to num("Maximum possible score for this mark, e.g. 100"),
+                required = listOf("subject_name", "kind", "label", "weight_percent", "max_score")
+            )
+        ),
+        AIToolDef(
+            "update_mark", "Edit an existing mark's label, weight, or max score (not the recorded score itself — use record_score for that). Matches by subject name and exact current label.",
+            obj(
+                "subject_name" to str("Subject the mark belongs to"),
+                "label" to str("Current exact label of the mark to edit"),
+                "new_label" to str("New label, if changing it"),
+                "new_weight_percent" to num("New weight percent, if changing it"),
+                "new_max_score" to num("New max score, if changing it"),
+                required = listOf("subject_name", "label")
+            )
+        ),
+        AIToolDef(
+            "delete_mark", "Permanently delete a mark (assessment definition) and whatever score was recorded on it. Matches by subject name and exact label. Only use when the user clearly asked to remove it.",
+            obj(
+                "subject_name" to str("Subject the mark belongs to"),
+                "label" to str("Exact label of the mark to delete"),
+                required = listOf("subject_name", "label")
+            )
+        ),
+        AIToolDef(
+            "analyze_subject",
+            "Deep analysis of one subject: every mark with its weight/score/grading status, the weighted running total, whether it's fully graded, and every unit with its study progress. Call this before answering questions about a specific subject's performance or standing.",
+            obj("subject_name" to str("Subject to analyze"), required = listOf("subject_name"))
         ),
         AIToolDef(
             "create_task", "Create a one-off task, assignment, homework, or test item on the temporary plan.",
@@ -177,6 +265,16 @@ object AIToolExecutor {
         when (name) {
             "list_subjects" -> listSubjects()
             "create_subject" -> createSubject(input)
+            "update_subject" -> updateSubject(input)
+            "delete_subject" -> deleteSubject(input)
+            "create_unit" -> createUnit(input)
+            "update_unit" -> updateUnit(input)
+            "delete_unit" -> deleteUnit(input)
+            "list_units" -> listUnits(input)
+            "create_mark" -> createMark(input)
+            "update_mark" -> updateMark(input)
+            "delete_mark" -> deleteMark(input)
+            "analyze_subject" -> analyzeSubject(input)
             "create_task" -> createTask(input)
             "update_task_status" -> updateTaskStatus(input)
             "log_task_progress" -> logTaskProgress(input)
@@ -210,6 +308,131 @@ object AIToolExecutor {
         val code = input.optString("code", "")
         val subject = VoidRepository.addSubject(name = name, grade = grade, code = code)
         return "Created subject '${subject.name}' (grade ${subject.grade})."
+    }
+
+    private fun updateSubject(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val newName = input.optString("new_name", "").takeIf { it.isNotBlank() }
+        val newGrade = if (input.has("new_grade")) input.optInt("new_grade") else null
+        val newCode = if (input.has("new_code")) input.optString("new_code") else null
+        val updated = VoidRepository.updateSubject(subject.id, name = newName, grade = newGrade, code = newCode)
+            ?: return "ERROR: could not update subject."
+        return "Updated subject '${updated.name}' (grade ${updated.grade}${if (updated.code.isNotBlank()) ", ${updated.code}" else ""})."
+    }
+
+    private fun deleteSubject(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        VoidRepository.deleteSubject(subject.id)
+        return "Deleted subject '${subject.name}' and everything attached only to it (units, marks, class periods, Circle Plan slots, exam sittings)."
+    }
+
+    private fun findUnit(subjectId: String, unitName: String) =
+        VoidRepository.unitsFor(subjectId).find { it.name.equals(unitName, ignoreCase = true) }
+
+    private fun findAssessmentType(subject: com.core.voidapp.data.Subject, label: String) =
+        subject.assessmentTypes.find { it.label.equals(label, ignoreCase = true) }
+
+    private fun createUnit(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val unitNumber = input.getInt("unit_number")
+        val name = input.getString("name")
+        val description = input.optString("description", "")
+        val estimatedMinutes = input.optInt("estimated_minutes", 0)
+        val unit = VoidRepository.addUnit(
+            subjectId = subject.id, unitNumber = unitNumber, name = name,
+            description = description, estimatedStudyMinutes = estimatedMinutes
+        )
+        return "Created unit '${unit.name}' (unit ${unit.unitNumber}) under '${subject.name}'."
+    }
+
+    private fun updateUnit(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val unitName = input.getString("unit_name")
+        val unit = findUnit(subject.id, unitName) ?: return "ERROR: no unit named '$unitName' under '${subject.name}'."
+        val newNumber = if (input.has("new_unit_number")) input.optInt("new_unit_number") else null
+        val newName = input.optString("new_name", "").takeIf { it.isNotBlank() }
+        val newDescription = if (input.has("new_description")) input.optString("new_description") else null
+        val newMinutes = if (input.has("new_estimated_minutes")) input.optInt("new_estimated_minutes") else null
+        val updated = VoidRepository.updateUnit(
+            unit.id, unitNumber = newNumber, name = newName,
+            description = newDescription, estimatedStudyMinutes = newMinutes
+        ) ?: return "ERROR: could not update unit."
+        return "Updated unit '${updated.name}' (unit ${updated.unitNumber}) under '${subject.name}'."
+    }
+
+    private fun deleteUnit(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val unitName = input.getString("unit_name")
+        val unit = findUnit(subject.id, unitName) ?: return "ERROR: no unit named '$unitName' under '${subject.name}'."
+        VoidRepository.deleteUnit(unit.id)
+        return "Deleted unit '${unit.name}' from '${subject.name}'."
+    }
+
+    private fun listUnits(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val units = VoidRepository.unitsFor(subject.id)
+        if (units.isEmpty()) return "No units registered under '${subject.name}' yet."
+        return units.joinToString("; ") { "Unit ${it.unitNumber}: ${it.name}${if (it.estimatedStudyMinutes > 0) " (~${it.estimatedStudyMinutes}min)" else ""}" }
+    }
+
+    private fun createMark(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val kind = runCatching { com.core.voidapp.data.AssessmentKind.valueOf(input.getString("kind")) }.getOrNull()
+            ?: return "ERROR: invalid kind."
+        val label = input.getString("label")
+        val weight = input.getDouble("weight_percent")
+        val maxScore = input.getDouble("max_score")
+        VoidRepository.addAssessmentType(subject.id, kind = kind, label = label, weightPercent = weight, maxScore = maxScore)
+        return "Created mark '$label' on '${subject.name}' (${weight}% of total, out of $maxScore)."
+    }
+
+    private fun updateMark(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val label = input.getString("label")
+        val type = findAssessmentType(subject, label) ?: return "ERROR: no mark labeled '$label' on '${subject.name}'."
+        val newLabel = input.optString("new_label", "").takeIf { it.isNotBlank() }
+        val newWeight = if (input.has("new_weight_percent")) input.optDouble("new_weight_percent") else null
+        val newMax = if (input.has("new_max_score")) input.optDouble("new_max_score") else null
+        val updated = VoidRepository.updateAssessmentType(
+            subject.id, type.id, label = newLabel, weightPercent = newWeight, maxScore = newMax
+        ) ?: return "ERROR: could not update mark."
+        return "Updated mark '${updated.label}' on '${subject.name}' (${updated.weightPercent}% of total, out of ${updated.maxScore})."
+    }
+
+    private fun deleteMark(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val label = input.getString("label")
+        val type = findAssessmentType(subject, label) ?: return "ERROR: no mark labeled '$label' on '${subject.name}'."
+        VoidRepository.deleteAssessmentType(subject.id, type.id)
+        return "Deleted mark '$label' from '${subject.name}'."
+    }
+
+    private fun analyzeSubject(input: JSONObject): String {
+        val subjectName = input.getString("subject_name")
+        val subject = findSubject(subjectName) ?: return "ERROR: no subject named '$subjectName'."
+        val sb = StringBuilder()
+        sb.append("SUBJECT: ${subject.name} (grade ${subject.grade}${if (subject.code.isNotBlank()) ", ${subject.code}" else ""})\n")
+        sb.append("MARKS: ").append(
+            subject.assessmentTypes.joinToString("; ") {
+                val status = it.entry?.let { e -> "${e.score}/${it.maxScore}" } ?: "ungraded"
+                "${it.label} [${it.kind}] weight=${it.weightPercent}% score=$status"
+            }.ifBlank { "none" }
+        )
+        sb.append("\nWEIGHTED TOTAL: ${subject.weightedTotal()}/100 (total weight defined: ${subject.totalWeight()}%)")
+        sb.append("\nFULLY GRADED: ${subject.isFullyGraded()}")
+        sb.append("\nUNITS: ").append(
+            VoidRepository.unitsFor(subject.id).joinToString("; ") { "Unit ${it.unitNumber}: ${it.name}" }.ifBlank { "none" }
+        )
+        return sb.toString()
     }
 
     private fun createTask(input: JSONObject): String {

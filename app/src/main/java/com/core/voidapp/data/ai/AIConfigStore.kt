@@ -17,17 +17,24 @@ object AIConfigStore {
     private const val PREFS_NAME = "void_ai_config"
     private const val KEY_PROVIDER = "provider"
     private const val KEY_API_KEY = "api_key"
+    private const val KEY_API_KEYS = "api_keys"
     private const val KEY_MODEL = "model"
     private const val KEY_BASE_URL = "base_url"
     private const val KEY_TOOLS_ENABLED = "tools_enabled"
+
+    /** Keys are stored newline-joined — never spaces/commas, since some providers' keys can contain those. */
+    private const val KEY_DELIMITER = "\n"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun save(context: Context, config: AIConfig) {
+        val keys = config.apiKeys.map { it.trim() }.filter { it.isNotBlank() }
+            .ifEmpty { listOfNotNull(config.apiKey.trim().takeIf { it.isNotBlank() }) }
         prefs(context).edit()
             .putString(KEY_PROVIDER, config.provider.name)
-            .putString(KEY_API_KEY, config.apiKey)
+            .putString(KEY_API_KEY, keys.firstOrNull() ?: "")
+            .putString(KEY_API_KEYS, keys.joinToString(KEY_DELIMITER))
             .putString(KEY_MODEL, config.model)
             .putString(KEY_BASE_URL, config.baseUrl)
             .apply()
@@ -37,11 +44,20 @@ object AIConfigStore {
         val p = prefs(context)
         val providerName = p.getString(KEY_PROVIDER, null) ?: return null
         val provider = runCatching { AIProvider.valueOf(providerName) }.getOrNull() ?: return null
-        val apiKey = p.getString(KEY_API_KEY, "") ?: ""
-        if (apiKey.isBlank()) return null
+
+        // Prefer the multi-key list; fall back to the single legacy key for
+        // configs saved before multi-key support existed.
+        val keysJoined = p.getString(KEY_API_KEYS, null)
+        val keys = if (!keysJoined.isNullOrBlank()) {
+            keysJoined.split(KEY_DELIMITER).map { it.trim() }.filter { it.isNotBlank() }
+        } else {
+            listOfNotNull(p.getString(KEY_API_KEY, null)?.trim()?.takeIf { it.isNotBlank() })
+        }
+        if (keys.isEmpty()) return null
+
         val model = p.getString(KEY_MODEL, provider.defaultModel) ?: provider.defaultModel
         val baseUrl = p.getString(KEY_BASE_URL, provider.defaultBaseUrl) ?: provider.defaultBaseUrl
-        return AIConfig(provider = provider, apiKey = apiKey, model = model, baseUrl = baseUrl)
+        return AIConfig(provider = provider, apiKey = keys.first(), apiKeys = keys, model = model, baseUrl = baseUrl)
     }
 
     fun clear(context: Context) {

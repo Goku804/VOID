@@ -25,11 +25,55 @@ object AIApiClient {
     /** Hard ceiling on tool round-trips per user turn — stops a runaway tool loop from hammering the provider forever. */
     private const val MAX_TOOL_ITERATIONS = 6
 
+    /**
+     * The multi-API-key fallback chain: config.apiKeys is tried in order,
+     * one full request at a time. If a key fails for ANY reason (quota
+     * exhausted, invalid, rate-limited, transient network error), the very
+     * next key in the list takes over the same request — the caller never
+     * sees the intermediate failures, only the first success or, if every
+     * key in the chain failed, the last error encountered. Falls back to
+     * config.apiKey alone if apiKeys is empty (older saved configs).
+     */
+    private fun keyChain(config: AIConfig): List<String> =
+        config.apiKeys.ifEmpty { listOf(config.apiKey) }.filter { it.isNotBlank() }
+
+    private fun <T> withKeyFallback(config: AIConfig, action: (AIConfig) -> T): T {
+        val keys = keyChain(config)
+        if (keys.isEmpty()) throw AIException("No API key configured.")
+        var lastError: AIException = AIException("All configured API keys failed.")
+        for (key in keys) {
+            try {
+                return action(config.copy(apiKey = key))
+            } catch (e: AIException) {
+                lastError = e
+                // Move on to the next key in the chain.
+            }
+        }
+        throw lastError
+    }
+
+    private suspend fun <T> withKeyFallbackSuspend(config: AIConfig, action: suspend (AIConfig) -> T): T {
+        val keys = keyChain(config)
+        if (keys.isEmpty()) throw AIException("No API key configured.")
+        var lastError: AIException = AIException("All configured API keys failed.")
+        for (key in keys) {
+            try {
+                return action(config.copy(apiKey = key))
+            } catch (e: AIException) {
+                lastError = e
+                // Move on to the next key in the chain.
+            }
+        }
+        throw lastError
+    }
+
     /** Sends the full conversation (role, content) pairs and returns the assistant's reply text. Throws AIException on failure. */
     fun sendMessage(config: AIConfig, systemPrompt: String, history: List<Pair<String, String>>): String =
-        when (config.provider) {
-            AIProvider.ANTHROPIC -> sendAnthropic(config, systemPrompt, history)
-            AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiCompatible(config, systemPrompt, history)
+        withKeyFallback(config) { single ->
+            when (single.provider) {
+                AIProvider.ANTHROPIC -> sendAnthropic(single, systemPrompt, history)
+                AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiCompatible(single, systemPrompt, history)
+            }
         }
 
     /**
@@ -41,6 +85,10 @@ object AIApiClient {
      * function is running on (network calls are the only part pushed onto
      * Dispatchers.IO), so it's safe for it to touch in-memory app state
      * directly.
+     *
+     * Also covered by the multi-key fallback chain: if the whole tool
+     * round-trip fails on the current key (e.g. it runs out of quota
+     * mid-conversation), it's retried from the top with the next key.
      */
     suspend fun sendMessageWithTools(
         config: AIConfig,
@@ -48,12 +96,14 @@ object AIApiClient {
         history: List<Pair<String, String>>,
         tools: List<AIToolDef>,
         executeTool: suspend (name: String, input: JSONObject) -> String
-    ): AIToolLoopResult = when (config.provider) {
-        AIProvider.ANTHROPIC -> sendAnthropicWithTools(config, systemPrompt, history, tools, executeTool)
-        AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiWithTools(config, systemPrompt, history, tools, executeTool)
+    ): AIToolLoopResult = withKeyFallbackSuspend(config) { single ->
+        when (single.provider) {
+            AIProvider.ANTHROPIC -> sendAnthropicWithTools(single, systemPrompt, history, tools, executeTool)
+            AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> sendOpenAiWithTools(single, systemPrompt, history, tools, executeTool)
+        }
     }
 
-    /** Lightweight reachability + auth check — reports success/failure only, never exposes the key. */
+    /** Lightweight reachability + auth check — reports success/failure only, never exposes the key. Exercises the full key chain, same as a real send. */
     fun testConnection(config: AIConfig): Result<Unit> = try {
         sendMessage(config, "You are a connection test. Reply with OK.", listOf("user" to "ping"))
         Result.success(Unit)
@@ -70,9 +120,11 @@ object AIApiClient {
      * endpoint — which OpenAI, Groq, and Anthropic all do.
      */
     fun fetchModels(config: AIConfig): Result<List<String>> = try {
-        val ids = when (config.provider) {
-            AIProvider.ANTHROPIC -> fetchAnthropicModels(config)
-            AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> fetchOpenAiCompatibleModels(config)
+        val ids = withKeyFallback(config) { single ->
+            when (single.provider) {
+                AIProvider.ANTHROPIC -> fetchAnthropicModels(single)
+                AIProvider.OPENAI, AIProvider.GROQ, AIProvider.OPENAI_COMPATIBLE -> fetchOpenAiCompatibleModels(single)
+            }
         }
         Result.success(ids)
     } catch (e: AIException) {

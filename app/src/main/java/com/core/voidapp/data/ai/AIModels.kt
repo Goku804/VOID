@@ -12,12 +12,23 @@ enum class AIProvider(val displayName: String, val defaultBaseUrl: String, val d
     OPENAI_COMPATIBLE("Other (OpenAI-compatible endpoint)", "", "")
 }
 
-/** Everything needed to make one API call. Never persisted anywhere except AIConfigStore. */
+/**
+ * Everything needed to make one API call. Never persisted anywhere except
+ * AIConfigStore.
+ *
+ * apiKey is the primary/first key — what's shown for display purposes and
+ * used for single-key flows like fetchModels. apiKeys is the full ordered
+ * fallback chain: when a request fails on one key, AIApiClient retries the
+ * same request with the next key in this list before giving up, so a
+ * quota-exhausted or invalid key doesn't stop the app cold. When only one
+ * key is configured, apiKeys defaults to just [apiKey].
+ */
 data class AIConfig(
     val provider: AIProvider,
     val apiKey: String,
     val model: String,
-    val baseUrl: String
+    val baseUrl: String,
+    val apiKeys: List<String> = if (apiKey.isBlank()) emptyList() else listOf(apiKey)
 )
 
 /** Result of an AI request — no exceptions escape past AIRepository, callers just branch on this. */
