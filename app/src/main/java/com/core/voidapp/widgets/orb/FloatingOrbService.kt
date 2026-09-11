@@ -27,6 +27,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.core.voidapp.MainActivity
 import com.core.voidapp.R
+import com.core.voidapp.data.guardian.GuardianEngine
 import com.core.voidapp.data.widgets.WidgetPreferences
 
 /**
@@ -106,6 +107,7 @@ class FloatingOrbService : Service(), LifecycleOwner, ViewModelStoreOwner, Saved
         view.setContent {
             OrbRoot(
                 sizeDp = orbSize.sizeDp.dp,
+                orbState = GuardianEngine.orbState.value,
                 onDrag = { dx, dy ->
                     val p = layoutParams ?: return@OrbRoot
                     p.x += dx.toInt()
