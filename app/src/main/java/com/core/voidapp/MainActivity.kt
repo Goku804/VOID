@@ -377,15 +377,6 @@ fun QuickAction(text: String) {
 }
 
 @Composable
-fun ExecutionScreen() {
-    PlaceholderScreen(
-        title = "EXECUTE",
-        subtitle = "ACTIVE STUDY SESSION",
-        message = "Session runner initializing..."
-    )
-}
-
-@Composable
 fun PlaceholderScreen(title: String, subtitle: String, message: String) {
     Column(
         modifier = Modifier

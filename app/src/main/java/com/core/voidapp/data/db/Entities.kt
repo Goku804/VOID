@@ -135,3 +135,41 @@ data class ChatMessageEntity(
     val content: String,
     val timestamp: Long
 )
+
+/** A recorded (or in-progress) run of an actual study timer — see StudySession in Models.kt for why this exists separately from CirclePlan/TemporaryTask. */
+@Entity(tableName = "study_sessions")
+data class StudySessionEntity(
+    @PrimaryKey val id: String,
+    val source: String,
+    val subjectId: String?,
+    val circlePlanId: String?,
+    val temporaryTaskId: String?,
+    val unitId: String?,
+    val label: String,
+    val plannedMinutes: Int,
+    val startedAt: Long,
+    val endedAt: Long?,
+    val status: String
+)
+
+/** VOID Guardian: the fixed-duration authority the user voluntarily grants Guardian. Only one row is ever "current" — see GuardianRepository. */
+@Entity(tableName = "guardian_commitments")
+data class GuardianCommitmentEntity(
+    @PrimaryKey val id: String,
+    val durationName: String,
+    val startedAt: Long,
+    val endsAt: Long,
+    val status: String
+)
+
+/** VOID Guardian: a single-row table of user-configured Guardian behavior. */
+@Entity(tableName = "guardian_settings")
+data class GuardianSettingsEntity(
+    @PrimaryKey val id: Int = 0,
+    val enforcementMode: String,
+    val voiceName: String?,
+    val speechRate: Float,
+    val pitch: Float,
+    val volume: Float,
+    val allowedPackages: String
+)

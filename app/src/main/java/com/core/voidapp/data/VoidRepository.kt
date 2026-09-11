@@ -39,6 +39,7 @@ object VoidRepository {
     val circlePlans = mutableStateListOf<CirclePlan>()
     val chatConversations = mutableStateListOf<ChatConversation>()
     val chatMessages = mutableStateListOf<ChatMessage>()
+    val studySessions = mutableStateListOf<StudySession>()
 
     private var database: VoidDatabase? = null
     private var appContext: Context? = null
@@ -78,7 +79,10 @@ object VoidRepository {
             temporaryTasks.addAll(db.temporaryTaskDao().getAll().map { it.toModel() })
             chatConversations.addAll(db.chatDao().getAllConversations().map { it.toModel() })
             chatMessages.addAll(db.chatDao().getAllMessages().map { it.toModel() })
+            studySessions.addAll(db.studySessionDao().getAll().map { it.toModel() })
         }
+
+        com.core.voidapp.data.guardian.GuardianRepository.init(context)
     }
 
     fun newId(): String = UUID.randomUUID().toString()
@@ -91,6 +95,53 @@ object VoidRepository {
      */
     private fun notifyWidgets() {
         appContext?.let { com.core.voidapp.widgets.glance.WidgetUpdateScheduler.refreshAll(it) }
+    }
+
+    // ---------------------------------------------------------------
+    // Study Sessions — the real "clock is running" state Guardian and
+    // EXECUTE both key off. See StudySession in Models.kt.
+    // ---------------------------------------------------------------
+
+    fun activeSession(): StudySession? = studySessions.find { it.status == StudySessionStatus.ACTIVE }
+
+    fun startSession(
+        source: StudySessionSource,
+        subjectId: String?,
+        label: String,
+        plannedMinutes: Int,
+        circlePlanId: String? = null,
+        temporaryTaskId: String? = null,
+        unitId: String? = null
+    ): StudySession {
+        val session = StudySession(
+            id = newId(), source = source, subjectId = subjectId, circlePlanId = circlePlanId,
+            temporaryTaskId = temporaryTaskId, unitId = unitId, label = label,
+            plannedMinutes = plannedMinutes, startedAt = java.time.LocalDateTime.now()
+        )
+        studySessions.add(session)
+        ioScope.launch { database?.studySessionDao()?.upsert(session.toEntity()) }
+        appContext?.let { com.core.voidapp.data.guardian.GuardianEngine.onSessionStarted(it, session) }
+        return session
+    }
+
+    fun completeSession(sessionId: String) {
+        val idx = studySessions.indexOfFirst { it.id == sessionId }
+        if (idx == -1) return
+        val updated = studySessions[idx].copy(endedAt = java.time.LocalDateTime.now(), status = StudySessionStatus.COMPLETED)
+        studySessions[idx] = updated
+        ioScope.launch { database?.studySessionDao()?.upsert(updated.toEntity()) }
+        appContext?.let { com.core.voidapp.data.guardian.GuardianEngine.onSessionCompleted(it, updated) }
+        notifyWidgets()
+    }
+
+    fun abandonSession(sessionId: String) {
+        val idx = studySessions.indexOfFirst { it.id == sessionId }
+        if (idx == -1) return
+        val updated = studySessions[idx].copy(endedAt = java.time.LocalDateTime.now(), status = StudySessionStatus.ABANDONED)
+        studySessions[idx] = updated
+        ioScope.launch { database?.studySessionDao()?.upsert(updated.toEntity()) }
+        appContext?.let { com.core.voidapp.data.guardian.GuardianEngine.onSessionAbandoned(it, updated) }
+        notifyWidgets()
     }
 
     fun addSubject(name: String, grade: Int, code: String = ""): Subject {

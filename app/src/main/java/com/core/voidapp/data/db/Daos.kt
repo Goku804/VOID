@@ -133,3 +133,36 @@ interface ChatDao {
     @Query("DELETE FROM chat_conversations WHERE id = :conversationId")
     suspend fun deleteConversation(conversationId: String)
 }
+
+@Dao
+interface StudySessionDao {
+    @Query("SELECT * FROM study_sessions")
+    suspend fun getAll(): List<StudySessionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: StudySessionEntity)
+
+    @Query("DELETE FROM study_sessions WHERE id = :id")
+    suspend fun deleteById(id: String)
+}
+
+@Dao
+interface GuardianCommitmentDao {
+    @Query("SELECT * FROM guardian_commitments")
+    suspend fun getAll(): List<GuardianCommitmentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: GuardianCommitmentEntity)
+
+    @Query("DELETE FROM guardian_commitments WHERE id = :id")
+    suspend fun deleteById(id: String)
+}
+
+@Dao
+interface GuardianSettingsDao {
+    @Query("SELECT * FROM guardian_settings WHERE id = 0")
+    suspend fun get(): GuardianSettingsEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: GuardianSettingsEntity)
+}

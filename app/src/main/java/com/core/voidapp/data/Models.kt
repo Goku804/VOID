@@ -320,3 +320,40 @@ fun Subject.totalWeight(): Double = assessmentTypes.sumOf { it.weightPercent }
 
 /** True once every AssessmentType for the subject has a recorded score. */
 fun Subject.isFullyGraded(): Boolean = assessmentTypes.isNotEmpty() && assessmentTypes.all { it.entry != null }
+
+// ---------------------------------------------------------------------
+// Study Session — the actual "timer is running" runtime state. Circle
+// Plan/Temporary Plan describe what SHOULD be studied; a StudySession is
+// VOID recording that the user actually started a clock on one of them.
+// This is what EXECUTE and Guardian both key off — "planned" and "active"
+// are different things, and this is what makes "active" real.
+// ---------------------------------------------------------------------
+
+enum class StudySessionSource { CIRCLE_PLAN, TEMPORARY_TASK, MANUAL }
+enum class StudySessionStatus { ACTIVE, COMPLETED, ABANDONED }
+
+data class StudySession(
+    val id: String,
+    val source: StudySessionSource,
+    val subjectId: String?,
+    val circlePlanId: String? = null,
+    val temporaryTaskId: String? = null,
+    val unitId: String? = null,
+    val label: String,
+    val plannedMinutes: Int,
+    val startedAt: java.time.LocalDateTime,
+    val endedAt: java.time.LocalDateTime? = null,
+    val status: StudySessionStatus = StudySessionStatus.ACTIVE
+)
+
+fun StudySession.elapsedMinutes(now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Int {
+    val until = endedAt ?: now
+    return java.time.Duration.between(startedAt, until).toMinutes().toInt().coerceAtLeast(0)
+}
+
+/** Never negative — once elapsed passes plannedMinutes, the session is simply running over, not "-5 minutes left". */
+fun StudySession.remainingMinutes(now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Int =
+    (plannedMinutes - elapsedMinutes(now)).coerceAtLeast(0)
+
+fun StudySession.isOverPlanned(now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Boolean =
+    elapsedMinutes(now) > plannedMinutes

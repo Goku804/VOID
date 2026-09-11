@@ -20,6 +20,9 @@ import com.core.voidapp.data.NightAvailability
 import com.core.voidapp.data.PlanPriority
 import com.core.voidapp.data.PlanTaskStatus
 import com.core.voidapp.data.PreferredWindow
+import com.core.voidapp.data.StudySession
+import com.core.voidapp.data.StudySessionSource
+import com.core.voidapp.data.StudySessionStatus
 import com.core.voidapp.data.Subject
 import com.core.voidapp.data.TemporaryPlanType
 import com.core.voidapp.data.TemporaryTask
@@ -182,4 +185,45 @@ fun ChatMessage.toEntity() = ChatMessageEntity(
 
 fun ChatMessageEntity.toModel() = ChatMessage(
     id = id, conversationId = conversationId, role = ChatRole.valueOf(role), content = content, timestamp = timestamp
+)
+
+fun StudySession.toEntity() = StudySessionEntity(
+    id = id, source = source.name, subjectId = subjectId, circlePlanId = circlePlanId,
+    temporaryTaskId = temporaryTaskId, unitId = unitId, label = label, plannedMinutes = plannedMinutes,
+    startedAt = startedAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+    endedAt = endedAt?.atZone(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+    status = status.name
+)
+
+fun StudySessionEntity.toModel() = StudySession(
+    id = id, source = StudySessionSource.valueOf(source), subjectId = subjectId, circlePlanId = circlePlanId,
+    temporaryTaskId = temporaryTaskId, unitId = unitId, label = label, plannedMinutes = plannedMinutes,
+    startedAt = java.time.Instant.ofEpochMilli(startedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime(),
+    endedAt = endedAt?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() },
+    status = StudySessionStatus.valueOf(status)
+)
+
+fun com.core.voidapp.data.guardian.GuardianCommitment.toEntity() = GuardianCommitmentEntity(
+    id = id, durationName = duration.name,
+    startedAt = startedAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+    endsAt = endsAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+    status = status.name
+)
+
+fun GuardianCommitmentEntity.toModel() = com.core.voidapp.data.guardian.GuardianCommitment(
+    id = id, duration = com.core.voidapp.data.guardian.CommitmentDuration.valueOf(durationName),
+    startedAt = java.time.Instant.ofEpochMilli(startedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime(),
+    endsAt = java.time.Instant.ofEpochMilli(endsAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime(),
+    status = com.core.voidapp.data.guardian.CommitmentStatus.valueOf(status)
+)
+
+fun com.core.voidapp.data.guardian.GuardianSettings.toEntity() = GuardianSettingsEntity(
+    enforcementMode = enforcementMode.name, voiceName = voiceName, speechRate = speechRate,
+    pitch = pitch, volume = volume, allowedPackages = allowedPackages.joinToString(",")
+)
+
+fun GuardianSettingsEntity.toModel() = com.core.voidapp.data.guardian.GuardianSettings(
+    enforcementMode = com.core.voidapp.data.guardian.EnforcementMode.valueOf(enforcementMode),
+    voiceName = voiceName, speechRate = speechRate, pitch = pitch, volume = volume,
+    allowedPackages = if (allowedPackages.isBlank()) emptySet() else allowedPackages.split(",").toSet()
 )

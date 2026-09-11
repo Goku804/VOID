@@ -17,9 +17,12 @@ import androidx.room.RoomDatabase
         CirclePlanEntity::class,
         TemporaryTaskEntity::class,
         ChatConversationEntity::class,
-        ChatMessageEntity::class
+        ChatMessageEntity::class,
+        StudySessionEntity::class,
+        GuardianCommitmentEntity::class,
+        GuardianSettingsEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class VoidDatabase : RoomDatabase() {
@@ -33,6 +36,9 @@ abstract class VoidDatabase : RoomDatabase() {
     abstract fun circlePlanDao(): CirclePlanDao
     abstract fun temporaryTaskDao(): TemporaryTaskDao
     abstract fun chatDao(): ChatDao
+    abstract fun studySessionDao(): StudySessionDao
+    abstract fun guardianCommitmentDao(): GuardianCommitmentDao
+    abstract fun guardianSettingsDao(): GuardianSettingsDao
 
     companion object {
         @Volatile private var INSTANCE: VoidDatabase? = null
