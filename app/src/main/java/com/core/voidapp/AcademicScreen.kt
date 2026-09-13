@@ -64,6 +64,9 @@ private enum class AcademicTab { SUBJECTS, UNITS, MARKS }
 @Composable
 fun AcademicScreenReal() {
     var tab by remember { mutableStateOf(AcademicTab.SUBJECTS) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var currentGrade by remember { mutableStateOf(com.core.voidapp.data.AcademicPreferences.currentGrade(context)) }
+    var gradeInput by remember { mutableStateOf(currentGrade?.toString() ?: "") }
 
     Column(
         modifier = Modifier
@@ -74,6 +77,32 @@ fun AcademicScreenReal() {
         Text("VOID", color = AAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
         Text("ACADEMIC", color = AText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("SUBJECTS \u2022 UNITS \u2022 MARKS", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        APanelCard {
+            Text("CURRENT GRADE", color = AAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Your timetable can mix grades (D-Class, electives), so VOID needs this told to it directly \u2014 it's used as the default everywhere a grade is needed.",
+                color = AMuted, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                AField(value = gradeInput, onValueChange = { gradeInput = it }, label = "Grade", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                ASmallButton("SET") {
+                    val g = gradeInput.toIntOrNull()
+                    if (g != null) {
+                        com.core.voidapp.data.AcademicPreferences.setCurrentGrade(context, g)
+                        currentGrade = g
+                    }
+                }
+            }
+            if (currentGrade != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("Currently set: Grade $currentGrade", color = AAccent, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -121,8 +150,9 @@ private fun ATab(label: String, selected: Boolean, modifier: Modifier = Modifier
 
 @Composable
 private fun SubjectsTab() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var name by remember { mutableStateOf("") }
-    var grade by remember { mutableStateOf("") }
+    var grade by remember { mutableStateOf(com.core.voidapp.data.AcademicPreferences.currentGrade(context)?.toString() ?: "") }
     var code by remember { mutableStateOf("") }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -192,10 +222,10 @@ private fun SubjectsTab() {
 @Composable
 private fun UnitsTab() {
     var subjectId by remember { mutableStateOf<String?>(null) }
-    var unitNumber by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var minutes by remember { mutableStateOf("") }
+    var totalUnitsText by remember { mutableStateOf("") }
+    var unitNames by remember { mutableStateOf(listOf<String>()) }
+    var defaultMinutes by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
 
     if (VoidRepository.subjects.isEmpty()) {
         EmptyHint("No subjects yet. Add one in the SUBJ tab first.")
@@ -205,28 +235,71 @@ private fun UnitsTab() {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             APanelCard {
-                Text("REGISTER UNIT", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("REGISTER UNITS", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Pick the subject (grade shown so same-named subjects across grades don't get mixed up), say how many units it has, then name each one below.",
+                    color = AMuted, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+                )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                ASubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it })
+                ASubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it; unitNames = emptyList(); totalUnitsText = ""; error = null })
                 Spacer(modifier = Modifier.height(6.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AField(value = unitNumber, onValueChange = { unitNumber = it }, label = "Unit #", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
-                    AField(value = minutes, onValueChange = { minutes = it }, label = "Est. minutes", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                    AField(
+                        value = totalUnitsText,
+                        onValueChange = { text ->
+                            totalUnitsText = text
+                            val count = text.toIntOrNull()?.coerceIn(0, 60) ?: 0
+                            unitNames = List(count) { idx -> unitNames.getOrNull(idx) ?: "" }
+                        },
+                        label = "Total units",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AField(value = defaultMinutes, onValueChange = { defaultMinutes = it }, label = "Est. min/unit (opt)", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                AField(value = name, onValueChange = { name = it }, label = "Unit name (e.g. Functions)")
-                Spacer(modifier = Modifier.height(6.dp))
-                AField(value = description, onValueChange = { description = it }, label = "Description (optional)")
+
+                if (unitNames.isNotEmpty()) {
+                    val existingCount = subjectId?.let { VoidRepository.unitsFor(it).size } ?: 0
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("NAME EACH UNIT", color = AMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    unitNames.forEachIndexed { idx, value ->
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("U${existingCount + idx + 1}", color = AAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp))
+                            AField(
+                                value = value,
+                                onValueChange = { v -> unitNames = unitNames.toMutableList().also { it[idx] = v } },
+                                label = "Unit ${existingCount + idx + 1} name",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
+
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(error!!, color = AWarn, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                }
 
                 Spacer(modifier = Modifier.height(10.dp))
-                ABigButton("+ SAVE UNIT") {
+                ABigButton("+ SAVE ALL UNITS") {
                     val sid = subjectId
-                    val num = unitNumber.toIntOrNull()
-                    val mins = minutes.toIntOrNull() ?: 0
-                    if (sid != null && num != null && name.isNotBlank()) {
-                        VoidRepository.addUnit(sid, num, name.trim(), description.trim(), mins)
-                        unitNumber = ""; name = ""; description = ""; minutes = ""
+                    val mins = defaultMinutes.toIntOrNull() ?: 0
+                    val existingCount = sid?.let { VoidRepository.unitsFor(it).size } ?: 0
+                    when {
+                        sid == null -> error = "Select a subject"
+                        unitNames.isEmpty() -> error = "Enter how many units this subject has"
+                        unitNames.any { it.isBlank() } -> error = "Name every unit before saving"
+                        else -> {
+                            unitNames.forEachIndexed { idx, unitName ->
+                                VoidRepository.addUnit(sid, existingCount + idx + 1, unitName.trim(), "", mins)
+                            }
+                            subjectId = null; totalUnitsText = ""; unitNames = emptyList(); defaultMinutes = ""; error = null
+                        }
                     }
                 }
             }
@@ -236,7 +309,7 @@ private fun UnitsTab() {
         items(VoidRepository.subjects) { subject ->
             val subjectUnits = VoidRepository.unitsFor(subject.id)
             if (subjectUnits.isNotEmpty()) {
-                Text(subject.name.uppercase(), color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("${subject.name.uppercase()} (GRADE ${subject.grade})", color = AMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 APanelCard {
                     subjectUnits.forEachIndexed { idx, unit ->
@@ -417,7 +490,8 @@ private fun MarkEntryRow(subject: Subject, type: AssessmentType) {
 @Composable
 private fun ASubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val name = VoidRepository.subjects.find { it.id == selectedId }?.name ?: "Select subject"
+    val selectedSubject = VoidRepository.subjects.find { it.id == selectedId }
+    val name = selectedSubject?.let { "${it.name} (Grade ${it.grade})" } ?: "Select subject"
     Box {
         Row(
             modifier = Modifier
@@ -436,7 +510,10 @@ private fun ASubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) 
                 DropdownMenuItem(text = { Text("Add a subject first") }, onClick = { open = false })
             }
             VoidRepository.subjects.forEach { subject ->
-                DropdownMenuItem(text = { Text(subject.name) }, onClick = { onSelected(subject.id); open = false })
+                DropdownMenuItem(
+                    text = { Text("${subject.name} (Grade ${subject.grade})") },
+                    onClick = { onSelected(subject.id); open = false }
+                )
             }
         }
     }

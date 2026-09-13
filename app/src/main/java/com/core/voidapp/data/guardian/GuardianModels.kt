@@ -41,10 +41,6 @@ enum class EnforcementMode { OFF, GENTLE, FOCUS, STRICT }
 
 data class GuardianSettings(
     val enforcementMode: EnforcementMode = EnforcementMode.OFF,
-    val voiceName: String? = null,
-    val speechRate: Float = 0.85f,
-    val pitch: Float = 0.65f,
-    val volume: Float = 1.0f,
     val allowedPackages: Set<String> = emptySet()
 )
 

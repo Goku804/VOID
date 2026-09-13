@@ -118,73 +118,110 @@ private fun STab(label: String, selected: Boolean, modifier: Modifier = Modifier
 @Composable
 private fun TimetableTab() {
     var selectedDay by remember { mutableStateOf(DayOfWeekVoid.MONDAY) }
-    var period by remember { mutableStateOf("") }
-    var subjectId by remember { mutableStateOf<String?>(null) }
-    var classType by remember { mutableStateOf(ClassType.REGULAR) }
-    var startText by remember { mutableStateOf("") }
-    var endText by remember { mutableStateOf("") }
+    var totalPeriodsText by remember { mutableStateOf("") }
+    var periodSubjects by remember { mutableStateOf(listOf<String?>()) }
+    var periodTypes by remember { mutableStateOf(listOf<ClassType>()) }
+    var firstStartText by remember { mutableStateOf("") }
+    var minutesPerPeriodText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 
         item {
             SetupPanel {
-                Text("REGISTER CLASS", color = SAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("REGISTER DAY'S TIMETABLE", color = SAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Pick the day and how many periods it has, then choose a subject for each one \u2014 no need to register them one at a time.",
+                    color = SMuted, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+                )
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (VoidRepository.subjects.isEmpty()) {
                     Text("Add a subject in SETTINGS \u2192 ACADEMIC first.", color = SMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 } else {
-                    DayDropdown(selected = selectedDay, onSelected = { selectedDay = it })
+                    DayDropdown(
+                        selected = selectedDay,
+                        onSelected = { selectedDay = it; periodSubjects = emptyList(); periodTypes = emptyList(); totalPeriodsText = ""; error = null }
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VoidTextField(value = period, onValueChange = { period = it }, label = "Period #", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
-                        Box(modifier = Modifier.weight(1f)) {
-                            SubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it })
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    VoidTextField(
+                        value = totalPeriodsText,
+                        onValueChange = { text ->
+                            totalPeriodsText = text
+                            val count = text.toIntOrNull()?.coerceIn(0, 15) ?: 0
+                            periodSubjects = List(count) { idx -> periodSubjects.getOrNull(idx) }
+                            periodTypes = List(count) { idx -> periodTypes.getOrNull(idx) ?: ClassType.REGULAR }
+                        },
+                        label = "Total periods this day",
+                        keyboardType = KeyboardType.Number
+                    )
 
-                    ClassTypeDropdown(selected = classType, onSelected = { classType = it })
-
-                    val isDClassType = classType == ClassType.LANGUAGE || classType == ClassType.LAB
-                    val alreadyHasDClassToday = VoidRepository.scheduleFor(selectedDay).any { it.isDClassSession() }
-                    if (isDClassType && !alreadyHasDClassToday && VoidRepository.dClassDayCount() >= 2) {
+                    if (periodSubjects.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "You already have D-Class (Language/Lab) on 2 days this week \u2014 adding a 3rd leaves less afternoon study time.",
-                            color = SWarn,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace
+                            "Optional \u2014 fill both to auto-fill start/end times back-to-back:",
+                            color = SMuted, fontSize = 9.sp, fontFamily = FontFamily.Monospace
                         )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            VoidTextField(value = firstStartText, onValueChange = { firstStartText = it }, label = "Period 1 start (HH:MM)", modifier = Modifier.weight(1f))
+                            VoidTextField(value = minutesPerPeriodText, onValueChange = { minutesPerPeriodText = it }, label = "Min per period", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+                        }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VoidTextField(value = startText, onValueChange = { startText = it }, label = "Start (HH:MM)", modifier = Modifier.weight(1f))
-                        VoidTextField(value = endText, onValueChange = { endText = it }, label = "End (HH:MM)", modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("EACH PERIOD", color = SMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val isDClassDay = periodTypes.any { it == ClassType.LANGUAGE || it == ClassType.LAB }
+                        val alreadyHasDClassToday = VoidRepository.scheduleFor(selectedDay).any { it.isDClassSession() }
+                        if (isDClassDay && !alreadyHasDClassToday && VoidRepository.dClassDayCount() >= 2) {
+                            Text(
+                                text = "You already have D-Class (Language/Lab) on 2 days this week \u2014 adding a 3rd leaves less afternoon study time.",
+                                color = SWarn, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
+                        periodSubjects.forEachIndexed { idx, sid ->
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text("P${idx + 1}", color = SAccent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SubjectDropdown(selectedId = sid, onSelected = { newId -> periodSubjects = periodSubjects.toMutableList().also { it[idx] = newId } })
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ClassTypeDropdown(
+                                selected = periodTypes.getOrElse(idx) { ClassType.REGULAR },
+                                onSelected = { newType -> periodTypes = periodTypes.toMutableList().also { it[idx] = newType } }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                     }
 
                     if (error != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(error!!, color = SWarn, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    VoidButton("+ SAVE CLASS") {
-                        val p = period.toIntOrNull()
-                        if (p == null || subjectId == null) {
-                            error = "Period and subject are required"
-                        } else {
-                            try {
-                                val start = if (startText.isBlank()) null else LocalTime.parse(startText.trim())
-                                val end = if (endText.isBlank()) null else LocalTime.parse(endText.trim())
-                                VoidRepository.addClassPeriod(selectedDay, p, subjectId!!, classType, start, end)
-                                period = ""; startText = ""; endText = ""; error = null
-                            } catch (e: Exception) {
-                                error = "Time must be HH:MM, e.g. 08:30"
+                    VoidButton("+ SAVE ALL PERIODS") {
+                        when {
+                            periodSubjects.isEmpty() -> error = "Enter how many periods this day has"
+                            periodSubjects.any { it == null } -> error = "Select a subject for every period"
+                            else -> {
+                                val firstStart = firstStartText.toLocalTimeOrNull()
+                                val minutesPerPeriod = minutesPerPeriodText.toIntOrNull()
+                                periodSubjects.forEachIndexed { idx, sid ->
+                                    val start = if (firstStart != null && minutesPerPeriod != null) firstStart.plusMinutes((idx * minutesPerPeriod).toLong()) else null
+                                    val end = if (start != null && minutesPerPeriod != null) start.plusMinutes(minutesPerPeriod.toLong()) else null
+                                    VoidRepository.addClassPeriod(selectedDay, idx + 1, sid!!, periodTypes.getOrElse(idx) { ClassType.REGULAR }, start, end)
+                                }
+                                periodSubjects = emptyList(); periodTypes = emptyList()
+                                totalPeriodsText = ""; firstStartText = ""; minutesPerPeriodText = ""
+                                error = null
                             }
                         }
                     }
@@ -369,7 +406,8 @@ private fun ClassTypeDropdown(selected: ClassType, onSelected: (ClassType) -> Un
 @Composable
 private fun SubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val name = VoidRepository.subjects.find { it.id == selectedId }?.name ?: "Select"
+    val subject = VoidRepository.subjects.find { it.id == selectedId }
+    val name = subject?.let { "${it.name} (G${it.grade})" } ?: "Select"
     Box {
         Row(
             modifier = Modifier
@@ -387,8 +425,8 @@ private fun SubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
             if (VoidRepository.subjects.isEmpty()) {
                 DropdownMenuItem(text = { Text("Add a subject first") }, onClick = { open = false })
             }
-            VoidRepository.subjects.forEach { subject ->
-                DropdownMenuItem(text = { Text(subject.name) }, onClick = { onSelected(subject.id); open = false })
+            VoidRepository.subjects.forEach { s ->
+                DropdownMenuItem(text = { Text("${s.name} (Grade ${s.grade})") }, onClick = { onSelected(s.id); open = false })
             }
         }
     }

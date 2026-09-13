@@ -218,12 +218,10 @@ fun GuardianCommitmentEntity.toModel() = com.core.voidapp.data.guardian.Guardian
 )
 
 fun com.core.voidapp.data.guardian.GuardianSettings.toEntity() = GuardianSettingsEntity(
-    enforcementMode = enforcementMode.name, voiceName = voiceName, speechRate = speechRate,
-    pitch = pitch, volume = volume, allowedPackages = allowedPackages.joinToString(",")
+    enforcementMode = enforcementMode.name, allowedPackages = allowedPackages.joinToString(",")
 )
 
 fun GuardianSettingsEntity.toModel() = com.core.voidapp.data.guardian.GuardianSettings(
     enforcementMode = com.core.voidapp.data.guardian.EnforcementMode.valueOf(enforcementMode),
-    voiceName = voiceName, speechRate = speechRate, pitch = pitch, volume = volume,
     allowedPackages = if (allowedPackages.isBlank()) emptySet() else allowedPackages.split(",").toSet()
 )

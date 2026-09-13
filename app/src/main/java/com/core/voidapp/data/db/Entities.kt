@@ -167,9 +167,5 @@ data class GuardianCommitmentEntity(
 data class GuardianSettingsEntity(
     @PrimaryKey val id: Int = 0,
     val enforcementMode: String,
-    val voiceName: String?,
-    val speechRate: Float,
-    val pitch: Float,
-    val volume: Float,
     val allowedPackages: String
 )

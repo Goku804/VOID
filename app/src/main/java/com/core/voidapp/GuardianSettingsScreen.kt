@@ -1,5 +1,10 @@
 package com.core.voidapp
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,12 +22,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -41,9 +43,9 @@ import androidx.compose.ui.unit.sp
 import com.core.voidapp.data.guardian.CommitmentDuration
 import com.core.voidapp.data.guardian.EnforcementMode
 import com.core.voidapp.data.guardian.GuardianCommitment
+import com.core.voidapp.data.guardian.GuardianNotifier
 import com.core.voidapp.data.guardian.GuardianRepository
 import com.core.voidapp.data.guardian.GuardianSettings
-import com.core.voidapp.data.guardian.GuardianVoice
 import com.core.voidapp.data.guardian.daysRemaining
 import com.core.voidapp.data.guardian.isCurrentlyActive
 import java.time.format.DateTimeFormatter
@@ -59,16 +61,19 @@ fun GuardianSettingsScreen() {
 
     var settings by remember { mutableStateOf(GuardianRepository.settings()) }
     var showEndConfirm by remember { mutableStateOf(false) }
-    var voicesReady by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        GuardianVoice.init(context) { voicesReady = true }
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasNotificationPermission = granted
     }
 
     fun applySettings(transform: (GuardianSettings) -> GuardianSettings) {
         GuardianRepository.updateSettings(transform)
         settings = GuardianRepository.settings()
-        GuardianVoice.applyVoicePreferences()
     }
 
     // Reading refreshTick anywhere below forces this screen to re-pull
@@ -121,68 +126,34 @@ fun GuardianSettingsScreen() {
                 }
             }
 
-            VoidSectionLabel("VOICE")
+            VoidSectionLabel("NOTIFICATIONS")
             VoidCard {
-                Text("SPEED", color = VoidColors.TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Slider(
-                    value = settings.speechRate,
-                    onValueChange = { applySettings { s -> s.copy(speechRate = it) } },
-                    valueRange = 0.6f..1.3f,
-                    colors = SliderDefaults.colors(thumbColor = VoidColors.Purple, activeTrackColor = VoidColors.Purple)
-                )
-                Text("PITCH \u2014 lower is deeper", color = VoidColors.TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Slider(
-                    value = settings.pitch,
-                    onValueChange = { applySettings { s -> s.copy(pitch = it) } },
-                    valueRange = 0.5f..1.2f,
-                    colors = SliderDefaults.colors(thumbColor = VoidColors.Purple, activeTrackColor = VoidColors.Purple)
-                )
-                Text("VOLUME", color = VoidColors.TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Slider(
-                    value = settings.volume,
-                    onValueChange = { applySettings { s -> s.copy(volume = it) } },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(thumbColor = VoidColors.Purple, activeTrackColor = VoidColors.Purple)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "TEST VOICE",
-                    color = VoidColors.Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.clickable { GuardianVoice.testVoice(context) }.padding(6.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-                Text("AVAILABLE VOICES", color = VoidColors.TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Spacer(modifier = Modifier.height(6.dp))
-                if (!voicesReady) {
-                    Text("Loading voices from the device's speech engine...", color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                } else {
-                    val voices = GuardianVoice.availableVoices(context)
-                        .filterNot { it.isNetworkConnectionRequired }
-                        .sortedByDescending { it.quality }
-                        .take(12)
-                    if (voices.isEmpty()) {
-                        Text("No offline voices reported by this device.", color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                    } else {
-                        voices.forEach { voice ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { applySettings { it.copy(voiceName = voice.name) } }
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = settings.voiceName == voice.name,
-                                    onClick = { applySettings { it.copy(voiceName = voice.name) } },
-                                    colors = RadioButtonDefaults.colors(selectedColor = VoidColors.Purple)
-                                )
-                                Text(voice.name, color = VoidColors.TextPrimary, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                            }
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDot(if (hasNotificationPermission) VoidColors.Success else VoidColors.Danger, Modifier.width(7.dp).height(7.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (hasNotificationPermission) "Notification permission granted" else "Notification permission not granted",
+                        color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!hasNotificationPermission) {
+                        Text(
+                            "GRANT", color = VoidColors.Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.clickable { notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }.padding(4.dp)
+                        )
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Guardian speaks through notifications now, not voice \u2014 every session/warning/deadline event posts (and updates) one alert.",
+                    color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "SEND TEST NOTIFICATION",
+                    color = VoidColors.Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.clickable { GuardianNotifier.testNotification(context) }.padding(6.dp)
+                )
             }
 
             VoidSectionLabel("ALLOWED APPS")
@@ -196,7 +167,7 @@ fun GuardianSettingsScreen() {
                     StatusDot(VoidColors.TextSecondary, Modifier.width(7.dp).height(7.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Not yet active on this build \u2014 Guardian will still narrate sessions, breaks, and deadlines, but won't detect leaving the app until this is implemented.",
+                        "Not yet active on this build \u2014 Guardian will still notify about sessions, breaks, and deadlines, but won't detect leaving the app until this is implemented.",
                         color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                     )
                 }

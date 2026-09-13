@@ -227,10 +227,11 @@ private fun PDayDropdown(selected: DayOfWeekVoid, onSelected: (DayOfWeekVoid) ->
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PSubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
-    val name = VoidRepository.subjects.find { it.id == selectedId }?.name ?: "Select subject"
+    val subject = VoidRepository.subjects.find { it.id == selectedId }
+    val name = subject?.let { "${it.name} (Grade ${it.grade})" } ?: "Select subject"
     PDropdownBase(label = name) { close ->
-        VoidRepository.subjects.forEach { subject ->
-            DropdownMenuItem(text = { Text(subject.name) }, onClick = { onSelected(subject.id); close() })
+        VoidRepository.subjects.forEach { s ->
+            DropdownMenuItem(text = { Text("${s.name} (Grade ${s.grade})") }, onClick = { onSelected(s.id); close() })
         }
     }
 }

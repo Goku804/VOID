@@ -27,6 +27,25 @@ object GuardianRepository {
     private var commitment: GuardianCommitment? = null
     private var settings: GuardianSettings = GuardianSettings()
 
+    /**
+     * Never treated as a distraction, on every install, regardless of
+     * whatever else is in Allowed Apps — the user explicitly needs to be
+     * able to ask an AI assistant or reach someone on Telegram mid-session
+     * without Guardian flagging it. Unioned in on every load (see init()),
+     * not just the fresh-install default, so it applies even to a device
+     * that already has a settings row from before this list existed.
+     *
+     * Package IDs are the standard Play Store ones as of this writing;
+     * a sideloaded or regional build could use a different ID, in which
+     * case add it manually in Settings -> Guardian -> Allowed Apps.
+     */
+    private val ALWAYS_ALLOWED = setOf(
+        "com.openai.chatgpt",       // ChatGPT
+        "com.anthropic.claude",     // Claude
+        "com.deepseek.chat",        // DeepSeek
+        "org.telegram.messenger"    // Telegram
+    )
+
     fun init(context: Context) {
         if (database != null) return
         val db = VoidDatabase.getInstance(context)
@@ -40,7 +59,12 @@ object GuardianRepository {
             val latest = commitments.maxByOrNull { it.startedAt }
             commitment = latest?.let { expireIfNeeded(it) }
 
-            settings = db.guardianSettingsDao().get()?.toModel() ?: GuardianSettings()
+            val loaded = db.guardianSettingsDao().get()?.toModel() ?: GuardianSettings()
+            val withAlwaysAllowed = loaded.copy(allowedPackages = loaded.allowedPackages + ALWAYS_ALLOWED)
+            settings = withAlwaysAllowed
+            if (withAlwaysAllowed.allowedPackages != loaded.allowedPackages) {
+                database?.guardianSettingsDao()?.upsert(withAlwaysAllowed.toEntity())
+            }
         }
     }
 

@@ -33,7 +33,7 @@ object GuardianEngine {
     private val announcedUrgentExamIds = mutableSetOf<String>()
 
     init {
-        GuardianVoice.setOrbStateListener { state ->
+        GuardianNotifier.setOrbStateListener { state ->
             orbState.value = if (state == GuardianOrbState.SPEAKING) state else restingState()
         }
     }
@@ -55,7 +55,7 @@ object GuardianEngine {
         warningState?.takeIf { it.sessionId == sessionId }?.warningCount ?: 0
 
     private fun speak(context: Context, event: GuardianEvent, ctx: GuardianSpeechContext) {
-        GuardianVoice.speak(context, GuardianDialogue.speak(event, ctx))
+        GuardianNotifier.notify(context, GuardianDialogue.speak(event, ctx))
     }
 
     private fun contextForSession(session: StudySession, warningLevel: Int = 0): GuardianSpeechContext {

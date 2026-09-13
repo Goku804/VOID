@@ -40,7 +40,7 @@ data class Subject(
     val name: String,
     val grade: Int,
     val code: String = "",
-    val assessmentTypes: MutableList<AssessmentType> = mutableListOf()
+    val assessmentTypes: List<AssessmentType> = emptyList()
 )
 
 /**
@@ -54,7 +54,7 @@ data class AssessmentType(
     val label: String,       // display name, e.g. "Chapter 3 Test"
     val weightPercent: Double,
     val maxScore: Double,
-    var entry: MarkEntry? = null
+    val entry: MarkEntry? = null
 )
 
 /** The actual score the user got for one AssessmentType. */

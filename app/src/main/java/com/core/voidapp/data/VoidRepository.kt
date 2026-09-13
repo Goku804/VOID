@@ -63,11 +63,8 @@ object VoidRepository {
 
             subjects.addAll(
                 subjectEntities.map { se ->
-                    se.toModel().also { subject ->
-                        subject.assessmentTypes.addAll(
-                            typeEntities.filter { it.subjectId == se.id }.map { it.toModel() }
-                        )
-                    }
+                    val types = typeEntities.filter { it.subjectId == se.id }.map { it.toModel() }
+                    se.toModel().copy(assessmentTypes = types)
                 }
             )
             units.addAll(db.unitDao().getAll().map { it.toModel() })
@@ -186,7 +183,9 @@ object VoidRepository {
         weightPercent: Double,
         maxScore: Double
     ) {
-        val subject = subjects.find { it.id == subjectId } ?: return
+        val idx = subjects.indexOfFirst { it.id == subjectId }
+        if (idx == -1) return
+        val subject = subjects[idx]
         val type = AssessmentType(
             id = newId(),
             kind = kind,
@@ -194,15 +193,18 @@ object VoidRepository {
             weightPercent = weightPercent,
             maxScore = maxScore
         )
-        subject.assessmentTypes.add(type)
+        subjects[idx] = subject.copy(assessmentTypes = subject.assessmentTypes + type)
         ioScope.launch { database?.assessmentTypeDao()?.upsert(type.toEntity(subjectId)) }
     }
 
     fun recordScore(subjectId: String, assessmentTypeId: String, score: Double) {
-        val subject = subjects.find { it.id == subjectId } ?: return
+        val idx = subjects.indexOfFirst { it.id == subjectId }
+        if (idx == -1) return
+        val subject = subjects[idx]
         val type = subject.assessmentTypes.find { it.id == assessmentTypeId } ?: return
-        type.entry = MarkEntry(score = score)
-        ioScope.launch { database?.assessmentTypeDao()?.upsert(type.toEntity(subjectId)) }
+        val updated = type.copy(entry = MarkEntry(score = score))
+        subjects[idx] = subject.copy(assessmentTypes = subject.assessmentTypes.map { if (it.id == updated.id) updated else it })
+        ioScope.launch { database?.assessmentTypeDao()?.upsert(updated.toEntity(subjectId)) }
     }
 
     /** Edits name/grade/code on an existing subject. Any parameter left null keeps its current value. */
@@ -289,33 +291,38 @@ object VoidRepository {
         weightPercent: Double? = null,
         maxScore: Double? = null
     ): AssessmentType? {
-        val subject = subjects.find { it.id == subjectId } ?: return null
-        val idx = subject.assessmentTypes.indexOfFirst { it.id == assessmentTypeId }
-        if (idx == -1) return null
-        val current = subject.assessmentTypes[idx]
+        val subjectIdx = subjects.indexOfFirst { it.id == subjectId }
+        if (subjectIdx == -1) return null
+        val subject = subjects[subjectIdx]
+        val current = subject.assessmentTypes.find { it.id == assessmentTypeId } ?: return null
         val updated = current.copy(
             label = label ?: current.label,
             weightPercent = weightPercent ?: current.weightPercent,
             maxScore = maxScore ?: current.maxScore
         )
-        subject.assessmentTypes[idx] = updated
+        subjects[subjectIdx] = subject.copy(assessmentTypes = subject.assessmentTypes.map { if (it.id == updated.id) updated else it })
         ioScope.launch { database?.assessmentTypeDao()?.upsert(updated.toEntity(subjectId)) }
         return updated
     }
 
     /** Deletes a mark definition entirely — including whatever score was recorded on it. */
     fun deleteAssessmentType(subjectId: String, assessmentTypeId: String) {
-        val subject = subjects.find { it.id == subjectId } ?: return
-        subject.assessmentTypes.removeAll { it.id == assessmentTypeId }
+        val idx = subjects.indexOfFirst { it.id == subjectId }
+        if (idx == -1) return
+        val subject = subjects[idx]
+        subjects[idx] = subject.copy(assessmentTypes = subject.assessmentTypes.filterNot { it.id == assessmentTypeId })
         ioScope.launch { database?.assessmentTypeDao()?.deleteById(assessmentTypeId) }
     }
 
     /** Clears a recorded score back to ungraded without deleting the mark definition itself. */
     fun clearScore(subjectId: String, assessmentTypeId: String) {
-        val subject = subjects.find { it.id == subjectId } ?: return
+        val idx = subjects.indexOfFirst { it.id == subjectId }
+        if (idx == -1) return
+        val subject = subjects[idx]
         val type = subject.assessmentTypes.find { it.id == assessmentTypeId } ?: return
-        type.entry = null
-        ioScope.launch { database?.assessmentTypeDao()?.upsert(type.toEntity(subjectId)) }
+        val updated = type.copy(entry = null)
+        subjects[idx] = subject.copy(assessmentTypes = subject.assessmentTypes.map { if (it.id == updated.id) updated else it })
+        ioScope.launch { database?.assessmentTypeDao()?.upsert(updated.toEntity(subjectId)) }
     }
 
     fun addClassPeriod(

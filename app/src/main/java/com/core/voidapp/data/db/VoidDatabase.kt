@@ -22,7 +22,7 @@ import androidx.room.RoomDatabase
         GuardianCommitmentEntity::class,
         GuardianSettingsEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class VoidDatabase : RoomDatabase() {
