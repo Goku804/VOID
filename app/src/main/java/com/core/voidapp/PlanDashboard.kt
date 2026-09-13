@@ -76,8 +76,8 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PlanNavCard("CIRCLE PLAN", "${VoidRepository.circlePlans.size} slots", Modifier.weight(1f), identityColor = VoidColors.Cyan) { onOpen(PlanSection.CIRCLE) }
-                PlanNavCard("TEMPORARY PLAN", "${VoidRepository.activeTemporaryTasks().size} active", Modifier.weight(1f), identityColor = VoidColors.Info) { onOpen(PlanSection.TEMPORARY) }
+                PlanNavCard("CIRCLE PLAN", "${VoidRepository.circlePlans.size} slots \u00b7 register in Settings", Modifier.weight(1f), identityColor = VoidColors.Cyan) { onOpen(PlanSection.CIRCLE) }
+                PlanNavCard("TEMPORARY PLAN", "${VoidRepository.activeTemporaryTasks().size} active \u00b7 register in Settings", Modifier.weight(1f), identityColor = VoidColors.Info) { onOpen(PlanSection.TEMPORARY) }
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -147,8 +147,7 @@ private fun UrgentPlanBanner(urgentSubjects: List<com.core.voidapp.data.ExamSubj
 
 @Composable
 private fun TodaysPlanSummaryCard() {
-    val today = todayAsVoidDay()
-    val circleToday = VoidRepository.circlePlansFor(today)
+    val circleToday = VoidRepository.circlePlansForToday()
     val tempDueToday = VoidRepository.temporaryTasksForDay(java.time.LocalDate.now())
     val totalItems = circleToday.size + tempDueToday.size
     val plannedMinutes = circleToday.sumOf { it.durationMinutes } + tempDueToday.sumOf { it.requiredMinutes }
@@ -243,7 +242,7 @@ private fun PlanSubScreen(title: String, onBack: () -> Unit, content: @Composabl
 }
 
 @Composable
-private fun ExamPrepComingSoon() {
+fun ExamPrepComingSoon() {
     Column(modifier = Modifier.fillMaxSize()) {
         VoidCard {
             Text("Exam Preparation isn't built yet.", color = VoidColors.TextPrimary, fontSize = 14.sp)

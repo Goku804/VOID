@@ -45,6 +45,7 @@ private enum class SettingsSection(val title: String, val subtitle: String, val 
     PLANNING("PLANNING", "Circle Plans \u00b7 Temporary Plans", false),
     REPORTS("REPORTS", "Daily \u00b7 Weekly \u00b7 Monthly", false),
     INTEGRATIONS("INTEGRATIONS", "AI Chat Configuration", true),
+    PLANNING("PLANNING", "Circle Plan \u00b7 Temporary Plan \u00b7 Exam Prep", true),
     WIDGETS("WIDGETS", "Smart Widgets \u00b7 Floating Orb", true),
     GUARDIAN("GUARDIAN", "Commitment \u00b7 Enforcement \u00b7 Voice", true),
     NOTIFICATIONS("NOTIFICATIONS", "Alerts \u00b7 Reminders", false),
@@ -79,6 +80,9 @@ fun SettingsScreen() {
         }
         SettingsSection.INTEGRATIONS -> SettingsSubScreen(section.title, onBack = { open = null }) {
             AISettingsScreen()
+        }
+        SettingsSection.PLANNING -> SettingsSubScreen(section.title, onBack = { open = null }) {
+            PlanningSettingsScreen()
         }
         SettingsSection.WIDGETS -> SettingsSubScreen(section.title, onBack = { open = null }) {
             WidgetsSettingsScreen()

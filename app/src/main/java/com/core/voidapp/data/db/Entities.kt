@@ -96,7 +96,8 @@ data class CirclePlanEntity(
     val strategy: String,
     val currentUnitIndex: Int,
     val fixedUnitId: String?,
-    val priority: String
+    val priority: String,
+    val weekInCycle: Int = 1
 )
 
 /** unitIds stored comma-joined — simple over a junction table for v1.0.0, see schema doc §6.3. */

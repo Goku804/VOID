@@ -54,6 +54,70 @@ import com.core.voidapp.data.resolvedUnit
 
 @Composable
 fun CirclePlansContent() {
+    val cycleLength = com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(androidx.compose.ui.platform.LocalContext.current)
+
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Text(
+                "Register new Circle Plan slots in SETTINGS \u2192 PLANNING. This is where you browse and step through what's already registered.",
+                color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (VoidRepository.circlePlans.isEmpty()) {
+            item { Text("Nothing registered yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+        }
+
+        if (cycleLength <= 1) {
+            item {
+                Text("WEEKLY CIRCLE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            items(DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }) { d ->
+                val plans = VoidRepository.circlePlansFor(d).filter { it.weekInCycle == 1 }
+                if (plans.isNotEmpty()) {
+                    Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    plans.forEach { plan ->
+                        CirclePlanRow(plan)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        } else {
+            items((1..cycleLength).toList()) { week ->
+                val weekPlans = VoidRepository.circlePlans.filter { it.weekInCycle == week }
+                if (weekPlans.isNotEmpty()) {
+                    Text("WEEK $week OF $cycleLength", color = VoidColors.Purple, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }.forEach { d ->
+                        val plans = weekPlans.filter { it.day == d }
+                        if (plans.isNotEmpty()) {
+                            Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            plans.forEach { plan ->
+                                CirclePlanRow(plan)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+}
+
+/** Registration form — lives in Settings -> Planning. What gets registered here shows up as browsable cards in PLAN -> Circle Plan. */
+@Composable
+fun CirclePlanRegistrationContent() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var cycleLength by remember { mutableStateOf(com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(context)) }
+    var weekInCycle by remember { mutableStateOf(1) }
     var day by remember { mutableStateOf(DayOfWeekVoid.MONDAY) }
     var subjectId by remember { mutableStateOf<String?>(null) }
     var duration by remember { mutableStateOf("") }
@@ -67,12 +131,45 @@ fun CirclePlansContent() {
 
         item {
             PVoidCard {
+                Text("CIRCLE CYCLE LENGTH", color = VoidColors.Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "1 week repeats the same schedule every week. A longer cycle lets a day mean something different from one week to the next before repeating \u2014 e.g. Monday is Math (Grade 9) in week 1 but Physics (Grade 11) in week 2.",
+                    color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (1..4).forEach { weeks ->
+                        CycleChip(label = "${weeks}W", selected = cycleLength == weeks) {
+                            cycleLength = weeks
+                            com.core.voidapp.data.CircleCyclePreferences.setCycleLengthWeeks(context, weeks)
+                            if (weekInCycle > weeks) weekInCycle = 1
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            PVoidCard {
                 Text("REGISTER CIRCLE PLAN", color = VoidColors.Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (VoidRepository.subjects.isEmpty()) {
                     Text("Add a subject in SETTINGS \u2192 ACADEMIC first.", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 } else {
+                    if (cycleLength > 1) {
+                        Text("WEEK IN CYCLE", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (1..cycleLength).forEach { w ->
+                                CycleChip(label = "WEEK $w", selected = weekInCycle == w) { weekInCycle = w }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
                     PDayDropdown(selected = day, onSelected = { day = it })
                     Spacer(modifier = Modifier.height(6.dp))
                     PSubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it; fixedUnitId = null })
@@ -107,7 +204,7 @@ fun CirclePlansContent() {
                             dur == null -> error = "Enter a duration"
                             strategy == ContentStrategy.FIXED_UNIT && fixedUnitId == null -> error = "Select a unit"
                             else -> {
-                                VoidRepository.addCirclePlan(day, sid, dur, window, strategy, fixedUnitId, priority)
+                                VoidRepository.addCirclePlan(day, sid, dur, window, strategy, fixedUnitId, priority, weekInCycle)
                                 duration = ""
                                 error = null
                             }
@@ -118,26 +215,25 @@ fun CirclePlansContent() {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        item {
-            Text("WEEKLY CIRCLE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        items(DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }) { d ->
-            val plans = VoidRepository.circlePlansFor(d)
-            if (plans.isNotEmpty()) {
-                Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                plans.forEach { plan ->
-                    CirclePlanRow(plan)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-
         item { Spacer(modifier = Modifier.height(90.dp)) }
     }
+}
+
+@Composable
+private fun CycleChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = if (selected) VoidColors.TextPrimary else VoidColors.TextSecondary,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) VoidColors.Purple.copy(alpha = 0.2f) else VoidColors.Surface2)
+            .border(1.dp, if (selected) VoidColors.Purple else VoidColors.Border, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    )
 }
 
 @Composable

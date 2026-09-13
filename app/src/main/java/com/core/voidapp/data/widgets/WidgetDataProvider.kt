@@ -87,7 +87,7 @@ object WidgetDataProvider {
     // -------------------------------------------------------------
 
     fun todayCirclePlan(date: LocalDate = LocalDate.now()): TodayCirclePlanState {
-        val plans = VoidRepository.circlePlansFor(todayAsVoidDay(date))
+        val plans = VoidRepository.circlePlansForToday(date)
         if (plans.isEmpty()) return TodayCirclePlanState.NoPlanToday
         return TodayCirclePlanState.Content(
             plans.map { plan ->

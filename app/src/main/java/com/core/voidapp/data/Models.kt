@@ -104,6 +104,13 @@ enum class PlanPriority { LOW, NORMAL, HIGH }
  * Temporary Plans and exams, which only interrupt/overlay it, never delete it.
  * Content is NOT the same unit forever: currentUnitIndex is a manual cursor
  * the user advances/rewinds through the subject's unit list.
+ *
+ * weekInCycle (1-based) is which week of the user's circle cycle this slot
+ * belongs to — a 1-week cycle means every slot is weekInCycle=1 (the
+ * simple, original behavior); a 3-week cycle lets Monday mean something
+ * different in week 1 vs week 2 vs week 3 before repeating. See
+ * CircleCyclePreferences for the cycle length + the anchor date that
+ * "which week is it right now" is computed from.
  */
 data class CirclePlan(
     val id: String,
@@ -114,7 +121,8 @@ data class CirclePlan(
     val strategy: ContentStrategy,
     val currentUnitIndex: Int = 0,
     val fixedUnitId: String? = null,
-    val priority: PlanPriority = PlanPriority.NORMAL
+    val priority: PlanPriority = PlanPriority.NORMAL,
+    val weekInCycle: Int = 1
 )
 
 /** Resolves which unit is "due" right now for this Circle Plan. */

@@ -139,13 +139,14 @@ fun ExamSubjectEntity.toModel() = ExamSubject(
 fun CirclePlan.toEntity() = CirclePlanEntity(
     id = id, day = day.name, subjectId = subjectId, durationMinutes = durationMinutes,
     window = window.name, strategy = strategy.name, currentUnitIndex = currentUnitIndex,
-    fixedUnitId = fixedUnitId, priority = priority.name
+    fixedUnitId = fixedUnitId, priority = priority.name, weekInCycle = weekInCycle
 )
 
 fun CirclePlanEntity.toModel() = CirclePlan(
     id = id, day = DayOfWeekVoid.valueOf(day), subjectId = subjectId, durationMinutes = durationMinutes,
     window = PreferredWindow.valueOf(window), strategy = ContentStrategy.valueOf(strategy),
-    currentUnitIndex = currentUnitIndex, fixedUnitId = fixedUnitId, priority = PlanPriority.valueOf(priority)
+    currentUnitIndex = currentUnitIndex, fixedUnitId = fixedUnitId, priority = PlanPriority.valueOf(priority),
+    weekInCycle = weekInCycle
 )
 
 // ---------------------------------------------------------------------

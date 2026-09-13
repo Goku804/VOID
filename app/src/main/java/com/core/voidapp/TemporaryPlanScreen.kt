@@ -59,6 +59,38 @@ import java.time.LocalTime
 
 @Composable
 fun TemporaryPlanContent() {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+
+        item {
+            Text(
+                "Register new Temporary Plans in SETTINGS \u2192 PLANNING. This is where you track and act on what's already active.",
+                color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            Text("ACTIVE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        val active = VoidRepository.activeTemporaryTasks()
+        if (active.isEmpty()) {
+            item { Text("No temporary plans yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+        }
+
+        items(active) { task ->
+            TemporaryTaskRow(task)
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        item { Spacer(modifier = Modifier.height(90.dp)) }
+    }
+}
+
+/** Registration form — lives in Settings -> Planning. What gets registered here shows up as browsable/actionable cards in PLAN -> Temporary Plan. */
+@Composable
+fun TemporaryPlanRegistrationContent() {
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(TemporaryPlanType.OTHER) }
     var subjectId by remember { mutableStateOf<String?>(null) }
@@ -167,21 +199,6 @@ fun TemporaryPlanContent() {
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            Text("ACTIVE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        val active = VoidRepository.activeTemporaryTasks()
-        if (active.isEmpty()) {
-            item { Text("No temporary plans yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
-        }
-
-        items(active) { task ->
-            TemporaryTaskRow(task)
-            Spacer(modifier = Modifier.height(10.dp))
         }
 
         item { Spacer(modifier = Modifier.height(90.dp)) }

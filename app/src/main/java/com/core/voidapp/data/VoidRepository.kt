@@ -377,7 +377,8 @@ object VoidRepository {
         window: PreferredWindow,
         strategy: ContentStrategy,
         fixedUnitId: String? = null,
-        priority: PlanPriority = PlanPriority.NORMAL
+        priority: PlanPriority = PlanPriority.NORMAL,
+        weekInCycle: Int = 1
     ): CirclePlan {
         val plan = CirclePlan(
             id = newId(),
@@ -387,7 +388,8 @@ object VoidRepository {
             window = window,
             strategy = strategy,
             fixedUnitId = fixedUnitId,
-            priority = priority
+            priority = priority,
+            weekInCycle = weekInCycle
         )
         circlePlans.add(plan)
         ioScope.launch { database?.circlePlanDao()?.upsert(plan.toEntity()) }
@@ -417,6 +419,20 @@ object VoidRepository {
 
     fun circlePlansFor(day: DayOfWeekVoid): List<CirclePlan> =
         circlePlans.filter { it.day == day }
+
+    /**
+     * What's actually active on a given calendar date — day-of-week AND
+     * the matching week-in-cycle (see CircleCyclePreferences). With the
+     * default 1-week cycle this is identical to circlePlansFor(day of
+     * week), so nothing changes for anyone who's never touched cycle
+     * length; a longer cycle is what lets Monday mean something different
+     * in week 2 than it did in week 1.
+     */
+    fun circlePlansForToday(date: java.time.LocalDate = java.time.LocalDate.now()): List<CirclePlan> {
+        val day = DayOfWeekVoid.valueOf(date.dayOfWeek.name)
+        val week = appContext?.let { com.core.voidapp.data.CircleCyclePreferences.weekInCycle(it, date) } ?: 1
+        return circlePlans.filter { it.day == day && it.weekInCycle == week }
+    }
 
     /**
      * Registers a new exam sitting, creating a fresh Exam (type + period +
