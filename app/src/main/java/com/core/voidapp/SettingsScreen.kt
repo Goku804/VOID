@@ -42,7 +42,6 @@ private enum class SettingsSection(val title: String, val subtitle: String, val 
     ACADEMIC("ACADEMIC", "Subjects \u00b7 Marks \u00b7 Exams", true),
     SCHEDULE("SCHEDULE", "Timetable \u00b7 Classes \u00b7 Calendar", true),
     EXAMS("EXAMS", "Exam Schedule", true),
-    PLANNING("PLANNING", "Circle Plans \u00b7 Temporary Plans", false),
     REPORTS("REPORTS", "Daily \u00b7 Weekly \u00b7 Monthly", false),
     INTEGRATIONS("INTEGRATIONS", "AI Chat Configuration", true),
     PLANNING("PLANNING", "Circle Plan \u00b7 Temporary Plan \u00b7 Exam Prep", true),
