@@ -170,3 +170,63 @@ data class GuardianSettingsEntity(
     val enforcementMode: String,
     val allowedPackages: String
 )
+
+// ---------------------------------------------------------------------
+// Daily Report — reflection/feedback data only. See DailyReportModels.kt
+// for why each of these doesn't duplicate ClassPeriod/StudySession/etc.
+// ---------------------------------------------------------------------
+
+@Entity(tableName = "daily_reports")
+data class DailyReportEntity(
+    @PrimaryKey val id: String,
+    val date: Long,
+    val status: String,
+    val createdAt: Long,
+    val completedAt: Long?
+)
+
+@Entity(tableName = "daily_class_reports")
+data class DailyClassReportEntity(
+    @PrimaryKey val id: String,
+    val dailyReportId: String,
+    val classPeriodId: String,
+    val attendance: String,
+    val understanding: String,
+    val difficulty: String,
+    val attention: String,
+    val tookNotes: String,
+    val importantContent: String,
+    val difficultyReason: String
+)
+
+@Entity(tableName = "daily_study_reports")
+data class DailyStudyReportEntity(
+    @PrimaryKey val id: String,
+    val dailyReportId: String,
+    val studySessionId: String?,
+    val subjectId: String?,
+    val label: String,
+    val completion: String,
+    val difficulty: String,
+    val understanding: String,
+    val attention: String,
+    val tookNotes: String,
+    val incompleteReason: String?,
+    val incompleteNotes: String
+)
+
+@Entity(tableName = "daily_report_assignments")
+data class DailyReportAssignmentEntity(
+    @PrimaryKey val id: String,
+    val dailyReportId: String,
+    val temporaryTaskId: String
+)
+
+@Entity(tableName = "daily_report_test_preps")
+data class DailyReportTestPrepEntity(
+    @PrimaryKey val id: String,
+    val dailyReportId: String,
+    val subjectId: String?,
+    val examSubjectId: String?,
+    val rawNote: String
+)

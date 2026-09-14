@@ -20,9 +20,14 @@ import androidx.room.RoomDatabase
         ChatMessageEntity::class,
         StudySessionEntity::class,
         GuardianCommitmentEntity::class,
-        GuardianSettingsEntity::class
+        GuardianSettingsEntity::class,
+        DailyReportEntity::class,
+        DailyClassReportEntity::class,
+        DailyStudyReportEntity::class,
+        DailyReportAssignmentEntity::class,
+        DailyReportTestPrepEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class VoidDatabase : RoomDatabase() {
@@ -39,6 +44,7 @@ abstract class VoidDatabase : RoomDatabase() {
     abstract fun studySessionDao(): StudySessionDao
     abstract fun guardianCommitmentDao(): GuardianCommitmentDao
     abstract fun guardianSettingsDao(): GuardianSettingsDao
+    abstract fun dailyReportDao(): DailyReportDao
 
     companion object {
         @Volatile private var INSTANCE: VoidDatabase? = null

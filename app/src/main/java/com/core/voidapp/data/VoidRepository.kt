@@ -40,6 +40,11 @@ object VoidRepository {
     val chatConversations = mutableStateListOf<ChatConversation>()
     val chatMessages = mutableStateListOf<ChatMessage>()
     val studySessions = mutableStateListOf<StudySession>()
+    val dailyReports = mutableStateListOf<com.core.voidapp.data.report.DailyReport>()
+    val dailyClassReports = mutableStateListOf<com.core.voidapp.data.report.DailyClassReport>()
+    val dailyStudyReports = mutableStateListOf<com.core.voidapp.data.report.DailyStudyReport>()
+    val dailyReportAssignments = mutableStateListOf<com.core.voidapp.data.report.DailyReportAssignment>()
+    val dailyReportTestPreps = mutableStateListOf<com.core.voidapp.data.report.DailyReportTestPrep>()
 
     private var database: VoidDatabase? = null
     private var appContext: Context? = null
@@ -77,6 +82,12 @@ object VoidRepository {
             chatConversations.addAll(db.chatDao().getAllConversations().map { it.toModel() })
             chatMessages.addAll(db.chatDao().getAllMessages().map { it.toModel() })
             studySessions.addAll(db.studySessionDao().getAll().map { it.toModel() })
+
+            dailyReports.addAll(db.dailyReportDao().getAllReports().map { it.toModel() })
+            dailyClassReports.addAll(db.dailyReportDao().getAllClassReports().map { it.toModel() })
+            dailyStudyReports.addAll(db.dailyReportDao().getAllStudyReports().map { it.toModel() })
+            dailyReportAssignments.addAll(db.dailyReportDao().getAllAssignments().map { it.toModel() })
+            dailyReportTestPreps.addAll(db.dailyReportDao().getAllTestPreps().map { it.toModel() })
         }
 
         com.core.voidapp.data.guardian.GuardianRepository.init(context)
@@ -140,6 +151,117 @@ object VoidRepository {
         appContext?.let { com.core.voidapp.data.guardian.GuardianEngine.onSessionAbandoned(it, updated) }
         notifyWidgets()
     }
+
+    // ---------------------------------------------------------------
+    // Daily Report — see data/report/DailyReportModels.kt. At most one
+    // DailyReport per calendar date; getOrCreateDailyReport is the only
+    // way callers should obtain one, so that invariant holds everywhere.
+    // ---------------------------------------------------------------
+
+    fun dailyReportFor(date: java.time.LocalDate): com.core.voidapp.data.report.DailyReport? =
+        dailyReports.find { it.date == date }
+
+    fun getOrCreateDailyReport(date: java.time.LocalDate): com.core.voidapp.data.report.DailyReport {
+        dailyReportFor(date)?.let { return it }
+        val report = com.core.voidapp.data.report.DailyReport(
+            id = newId(), date = date, status = com.core.voidapp.data.report.DailyReportStatus.NOT_STARTED,
+            createdAt = java.time.LocalDateTime.now()
+        )
+        dailyReports.add(report)
+        ioScope.launch { database?.dailyReportDao()?.upsertReport(report.toEntity()) }
+        return report
+    }
+
+    fun setDailyReportStatus(reportId: String, status: com.core.voidapp.data.report.DailyReportStatus) {
+        val idx = dailyReports.indexOfFirst { it.id == reportId }
+        if (idx == -1) return
+        val updated = dailyReports[idx].copy(
+            status = status,
+            completedAt = if (status == com.core.voidapp.data.report.DailyReportStatus.COMPLETED) java.time.LocalDateTime.now() else dailyReports[idx].completedAt
+        )
+        dailyReports[idx] = updated
+        ioScope.launch { database?.dailyReportDao()?.upsertReport(updated.toEntity()) }
+    }
+
+    fun classReportsFor(dailyReportId: String): List<com.core.voidapp.data.report.DailyClassReport> =
+        dailyClassReports.filter { it.dailyReportId == dailyReportId }
+
+    /** Upserts by (dailyReportId, classPeriodId) — re-answering the same class today replaces the earlier answer instead of duplicating it. */
+    fun saveDailyClassReport(report: com.core.voidapp.data.report.DailyClassReport) {
+        val idx = dailyClassReports.indexOfFirst { it.dailyReportId == report.dailyReportId && it.classPeriodId == report.classPeriodId }
+        if (idx == -1) dailyClassReports.add(report) else dailyClassReports[idx] = report
+        ioScope.launch { database?.dailyReportDao()?.upsertClassReport(report.toEntity()) }
+        setDailyReportStatus(report.dailyReportId, com.core.voidapp.data.report.DailyReportStatus.IN_PROGRESS)
+    }
+
+    fun studyReportsFor(dailyReportId: String): List<com.core.voidapp.data.report.DailyStudyReport> =
+        dailyStudyReports.filter { it.dailyReportId == dailyReportId }
+
+    fun saveDailyStudyReport(report: com.core.voidapp.data.report.DailyStudyReport) {
+        val idx = dailyStudyReports.indexOfFirst {
+            it.dailyReportId == report.dailyReportId && (it.studySessionId == report.studySessionId) && it.label == report.label
+        }
+        if (idx == -1) dailyStudyReports.add(report) else dailyStudyReports[idx] = report
+        ioScope.launch { database?.dailyReportDao()?.upsertStudyReport(report.toEntity()) }
+        setDailyReportStatus(report.dailyReportId, com.core.voidapp.data.report.DailyReportStatus.IN_PROGRESS)
+    }
+
+    /**
+     * Records a teacher assignment as REAL planning data — a genuine
+     * TemporaryTask, not a report-only note (spec #3/#25/#26). Returns the
+     * created task so the caller can show it back to the user.
+     */
+    fun addAssignmentFromDailyReport(
+        dailyReportId: String,
+        title: String,
+        subjectId: String?,
+        deadline: java.time.LocalDate,
+        notes: String
+    ): TemporaryTask {
+        val task = addTemporaryTask(
+            title = title, type = TemporaryPlanType.ASSIGNMENT, subjectId = subjectId,
+            startDate = null, deadline = deadline, requiredMinutes = 0, priority = PlanPriority.NORMAL, notes = notes
+        )
+        val link = com.core.voidapp.data.report.DailyReportAssignment(id = newId(), dailyReportId = dailyReportId, temporaryTaskId = task.id)
+        dailyReportAssignments.add(link)
+        ioScope.launch { database?.dailyReportDao()?.upsertAssignment(link.toEntity()) }
+        setDailyReportStatus(dailyReportId, com.core.voidapp.data.report.DailyReportStatus.IN_PROGRESS)
+        return task
+    }
+
+    fun assignmentsFor(dailyReportId: String): List<com.core.voidapp.data.report.DailyReportAssignment> =
+        dailyReportAssignments.filter { it.dailyReportId == dailyReportId }
+
+    /**
+     * Records a teacher's test/exam instruction. Only registers a real
+     * Exam/ExamSubject when both a subject and an expected date were
+     * actually given (spec #3 — never invent an exam from a vague note).
+     */
+    fun addTestPrepFromDailyReport(
+        dailyReportId: String,
+        subjectId: String?,
+        examType: ExamType?,
+        expectedDate: java.time.LocalDate?,
+        rawNote: String
+    ): com.core.voidapp.data.report.DailyReportTestPrep {
+        var examSubjectId: String? = null
+        if (subjectId != null && expectedDate != null && examType != null) {
+            val examSubject = registerExam(
+                examType = examType, subjectId = subjectId, date = expectedDate, time = null, session = null
+            )
+            examSubjectId = examSubject.id
+        }
+        val entry = com.core.voidapp.data.report.DailyReportTestPrep(
+            id = newId(), dailyReportId = dailyReportId, subjectId = subjectId, examSubjectId = examSubjectId, rawNote = rawNote
+        )
+        dailyReportTestPreps.add(entry)
+        ioScope.launch { database?.dailyReportDao()?.upsertTestPrep(entry.toEntity()) }
+        setDailyReportStatus(dailyReportId, com.core.voidapp.data.report.DailyReportStatus.IN_PROGRESS)
+        return entry
+    }
+
+    fun testPrepsFor(dailyReportId: String): List<com.core.voidapp.data.report.DailyReportTestPrep> =
+        dailyReportTestPreps.filter { it.dailyReportId == dailyReportId }
 
     fun addSubject(name: String, grade: Int, code: String = ""): Subject {
         val subject = Subject(id = newId(), name = name, grade = grade, code = code)

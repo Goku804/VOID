@@ -1,11 +1,5 @@
 package com.core.voidapp
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,48 +9,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.core.voidapp.data.PlanTaskStatus
 import com.core.voidapp.data.VoidRepository
 import com.core.voidapp.data.daysRemaining
 import com.core.voidapp.data.isOverdue
 
-private enum class PlanSection(val title: String) {
-    CIRCLE("CIRCLE PLAN"), TEMPORARY("TEMPORARY PLAN"), EXAM_PREP("EXAM PREPARATION")
-}
-
+/**
+ * PLAN is a single scrollable page, not a drill-down menu: everything the
+ * user has ever registered (Circle Plan, Temporary Plan, Exam Prep) shows
+ * up here directly, today's items first. Registration itself happens in
+ * Settings -> Planning; this tab is read/act-only.
+ */
 @Composable
 fun PlanningScreen() {
-    var open by remember { mutableStateOf<PlanSection?>(null) }
-
-    BackHandler(enabled = open != null) { open = null }
-
-    when (val section = open) {
-        null -> PlanDashboard(onOpen = { open = it })
-        PlanSection.CIRCLE -> PlanSubScreen(section.title, onBack = { open = null }) { CirclePlansContent() }
-        PlanSection.TEMPORARY -> PlanSubScreen(section.title, onBack = { open = null }) { TemporaryPlanContent() }
-        PlanSection.EXAM_PREP -> PlanSubScreen(section.title, onBack = { open = null }) { ExamPrepComingSoon() }
-    }
-}
-
-@Composable
-private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -75,14 +47,6 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
         }
 
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PlanNavCard("CIRCLE PLAN", "${VoidRepository.circlePlans.size} slots \u00b7 register in Settings", Modifier.weight(1f), identityColor = VoidColors.Cyan) { onOpen(PlanSection.CIRCLE) }
-                PlanNavCard("TEMPORARY PLAN", "${VoidRepository.activeTemporaryTasks().size} active \u00b7 register in Settings", Modifier.weight(1f), identityColor = VoidColors.Info) { onOpen(PlanSection.TEMPORARY) }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        item {
             val urgent = VoidRepository.urgentExamSubjects()
             if (urgent.isNotEmpty()) {
                 UrgentPlanBanner(urgent)
@@ -91,13 +55,41 @@ private fun PlanDashboard(onOpen: (PlanSection) -> Unit) {
         }
 
         item {
-            PlanNavCard(
-                title = "EXAM PREPARATION",
-                subtitle = "Coming in v0.11.0 \u2014 needs the Priority Engine",
-                modifier = Modifier.fillMaxWidth(),
-                soon = true,
-                identityColor = VoidColors.Purple
-            ) { onOpen(PlanSection.EXAM_PREP) }
+            val circleToday = VoidRepository.circlePlansForToday()
+            val tempToday = VoidRepository.temporaryTasksForDay(java.time.LocalDate.now())
+            if (circleToday.isNotEmpty() || tempToday.isNotEmpty()) {
+                VoidSectionLabel("TODAY")
+                Spacer(modifier = Modifier.height(8.dp))
+                circleToday.forEach { plan ->
+                    CirclePlanRow(plan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                tempToday.forEach { task ->
+                    TemporaryTaskRow(task)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        item {
+            VoidSectionLabel("CIRCLE PLAN \u2014 EVERY WEEK")
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        circlePlanBrowseItems()
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+
+        item {
+            VoidSectionLabel("TEMPORARY PLANS")
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        temporaryPlanBrowseItems()
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+
+        item {
+            VoidSectionLabel("EXAM PREPARATION")
+            Spacer(modifier = Modifier.height(8.dp))
+            ExamPrepComingSoon()
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -191,53 +183,6 @@ private fun StatusLine(color: androidx.compose.ui.graphics.Color, text: String) 
         StatusDot(color, Modifier.height(7.dp).then(Modifier.width(7.dp)))
         Spacer(modifier = Modifier.width(8.dp))
         Text(text, color = VoidColors.TextPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-    }
-}
-
-@Composable
-private fun PlanNavCard(title: String, subtitle: String, modifier: Modifier = Modifier, soon: Boolean = false, identityColor: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
-    VoidCard(modifier = modifier.clickable { onClick() }) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (identityColor != null) {
-                StatusDot(identityColor, Modifier.width(7.dp).height(7.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = VoidColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Text(subtitle, color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-            }
-            if (soon) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(VoidColors.Warning.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("SOON", color = VoidColors.Warning, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlanSubScreen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBackIosNew,
-                contentDescription = "Back",
-                tint = VoidColors.Accent,
-                modifier = Modifier.clickable { onBack() }.padding(end = 12.dp)
-            )
-            Text("PLAN / $title", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        }
-        Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            content()
-        }
     }
 }
 

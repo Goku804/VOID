@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,61 +55,65 @@ import com.core.voidapp.data.resolvedUnit
 
 @Composable
 fun CirclePlansContent() {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        circlePlanBrowseItems()
+    }
+}
+
+/** Embeddable version of the Circle Plan browsing list — used directly inside PLAN's single merged page, and by the standalone wrapper above. */
+@Composable
+fun LazyListScope.circlePlanBrowseItems() {
     val cycleLength = com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(androidx.compose.ui.platform.LocalContext.current)
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    item {
+        Text(
+            "Register new Circle Plan slots in SETTINGS \u2192 PLANNING. This is where you browse and step through what's already registered.",
+            color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (VoidRepository.circlePlans.isEmpty()) {
+        item { Text("Nothing registered yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+    }
+
+    if (cycleLength <= 1) {
         item {
-            Text(
-                "Register new Circle Plan slots in SETTINGS \u2192 PLANNING. This is where you browse and step through what's already registered.",
-                color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("WEEKLY CIRCLE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
         }
-
-        if (VoidRepository.circlePlans.isEmpty()) {
-            item { Text("Nothing registered yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
-        }
-
-        if (cycleLength <= 1) {
-            item {
-                Text("WEEKLY CIRCLE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+        items(DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }) { d ->
+            val plans = VoidRepository.circlePlansFor(d).filter { it.weekInCycle == 1 }
+            if (plans.isNotEmpty()) {
+                Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                plans.forEach { plan ->
+                    CirclePlanRow(plan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }) { d ->
-                val plans = VoidRepository.circlePlansFor(d).filter { it.weekInCycle == 1 }
-                if (plans.isNotEmpty()) {
-                    Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    plans.forEach { plan ->
-                        CirclePlanRow(plan)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-        } else {
-            items((1..cycleLength).toList()) { week ->
-                val weekPlans = VoidRepository.circlePlans.filter { it.weekInCycle == week }
-                if (weekPlans.isNotEmpty()) {
-                    Text("WEEK $week OF $cycleLength", color = VoidColors.Purple, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }.forEach { d ->
-                        val plans = weekPlans.filter { it.day == d }
-                        if (plans.isNotEmpty()) {
-                            Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            plans.forEach { plan ->
-                                CirclePlanRow(plan)
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
+        }
+    } else {
+        items((1..cycleLength).toList()) { week ->
+            val weekPlans = VoidRepository.circlePlans.filter { it.weekInCycle == week }
+            if (weekPlans.isNotEmpty()) {
+                Text("WEEK $week OF $cycleLength", color = VoidColors.Purple, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                DayOfWeekVoid.entries.filter { it != DayOfWeekVoid.SUNDAY }.forEach { d ->
+                    val plans = weekPlans.filter { it.day == d }
+                    if (plans.isNotEmpty()) {
+                        Text(d.name, color = VoidColors.Accent, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        plans.forEach { plan ->
+                            CirclePlanRow(plan)
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
-
-        item { Spacer(modifier = Modifier.height(90.dp)) }
     }
 }
 
@@ -118,6 +123,7 @@ fun CirclePlanRegistrationContent() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var cycleLength by remember { mutableStateOf(com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(context)) }
     var weekInCycle by remember { mutableStateOf(1) }
+    var gradeText by remember { mutableStateOf(com.core.voidapp.data.AcademicPreferences.currentGrade(context)?.toString() ?: "") }
     var day by remember { mutableStateOf(DayOfWeekVoid.MONDAY) }
     var subjectId by remember { mutableStateOf<String?>(null) }
     var duration by remember { mutableStateOf("") }
@@ -172,7 +178,23 @@ fun CirclePlanRegistrationContent() {
 
                     PDayDropdown(selected = day, onSelected = { day = it })
                     Spacer(modifier = Modifier.height(6.dp))
-                    PSubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it; fixedUnitId = null })
+
+                    Text("GRADE", color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Which grade's subjects should this slot pick from? Defaults to your current grade (Settings \u2192 Academic).",
+                        color = VoidColors.TextSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    PField(
+                        value = gradeText,
+                        onValueChange = { gradeText = it; subjectId = null },
+                        label = "Grade",
+                        keyboardType = KeyboardType.Number
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    PSubjectDropdown(selectedId = subjectId, onSelected = { subjectId = it; fixedUnitId = null }, gradeFilter = gradeText.toIntOrNull())
                     Spacer(modifier = Modifier.height(6.dp))
 
                     PField(value = duration, onValueChange = { duration = it }, label = "Duration (min)", keyboardType = KeyboardType.Number)
@@ -322,11 +344,15 @@ private fun PDayDropdown(selected: DayOfWeekVoid, onSelected: (DayOfWeekVoid) ->
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PSubjectDropdown(selectedId: String?, onSelected: (String) -> Unit) {
+private fun PSubjectDropdown(selectedId: String?, onSelected: (String) -> Unit, gradeFilter: Int? = null) {
     val subject = VoidRepository.subjects.find { it.id == selectedId }
     val name = subject?.let { "${it.name} (Grade ${it.grade})" } ?: "Select subject"
+    val options = if (gradeFilter != null) VoidRepository.subjects.filter { it.grade == gradeFilter } else VoidRepository.subjects
     PDropdownBase(label = name) { close ->
-        VoidRepository.subjects.forEach { s ->
+        if (options.isEmpty()) {
+            DropdownMenuItem(text = { Text("No Grade $gradeFilter subjects \u2014 add one in Settings \u2192 Academic") }, onClick = { close() })
+        }
+        options.forEach { s ->
             DropdownMenuItem(text = { Text("${s.name} (Grade ${s.grade})") }, onClick = { onSelected(s.id); close() })
         }
     }

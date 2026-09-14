@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,13 +55,18 @@ class MainActivity : ComponentActivity() {
 fun VoidApp() {
     var selectedDest by remember { mutableStateOf(VoidDestination.HOME) }
     var showAiChat by remember { mutableStateOf(false) }
+    var showDailyReport by remember { mutableStateOf(false) }
     val navVisibility = rememberNavVisibilityState()
 
-    // Back closes the isolated AI Chat overlay first (if open), then
-    // returns to HOME, then exits on a further press — matches normal
-    // Android behavior instead of closing from any tab.
-    androidx.activity.compose.BackHandler(enabled = showAiChat || selectedDest != VoidDestination.HOME) {
-        if (showAiChat) showAiChat = false else selectedDest = VoidDestination.HOME
+    // Back closes the isolated AI Chat / Daily Report overlay first (if
+    // open), then returns to HOME, then exits on a further press —
+    // matches normal Android behavior instead of closing from any tab.
+    androidx.activity.compose.BackHandler(enabled = showAiChat || showDailyReport || selectedDest != VoidDestination.HOME) {
+        when {
+            showAiChat -> showAiChat = false
+            showDailyReport -> showDailyReport = false
+            else -> selectedDest = VoidDestination.HOME
+        }
     }
 
     MaterialTheme {
@@ -91,7 +97,7 @@ fun VoidApp() {
                         .nestedScroll(navVisibility.connection)
                 ) {
                     when (selectedDest) {
-                        VoidDestination.HOME -> HomeScreen()
+                        VoidDestination.HOME -> HomeScreen(onOpenDailyReport = { showDailyReport = true })
                         VoidDestination.PLAN -> PlanningScreen()
                         VoidDestination.EXECUTE -> ExecutionScreen()
                         VoidDestination.SETTINGS -> SettingsScreen()
@@ -100,7 +106,7 @@ fun VoidApp() {
 
                 FloatingBottomNav(
                     selected = selectedDest,
-                    visible = navVisibility.visible.value && !showAiChat,
+                    visible = navVisibility.visible.value && !showAiChat && !showDailyReport,
                     onSelect = { selectedDest = it },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
@@ -111,7 +117,7 @@ fun VoidApp() {
                 // anywhere on screen; position is clamped to stay fully
                 // on-screen no matter where the drag ends.
                 FloatingAiButton(
-                    visible = !showAiChat,
+                    visible = !showAiChat && !showDailyReport,
                     onClick = { showAiChat = true },
                     offsetPx = aiButtonOffset,
                     onDrag = { delta ->
@@ -141,13 +147,25 @@ fun VoidApp() {
                         )
                     }
                 }
+
+                // Full-screen Daily Report overlay — same isolated pattern as
+                // AI Chat: its own solid background, closed explicitly.
+                if (showDailyReport) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(VoidColors.Background)
+                    ) {
+                        DailyReportScreen(onClose = { showDailyReport = false })
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(onOpenDailyReport: () -> Unit = {}) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
@@ -247,8 +265,7 @@ fun HomeScreen() {
             VoidSectionLabel("TODAY'S CIRCLE PLAN")
             Spacer(modifier = Modifier.height(8.dp))
 
-            val today = todayAsVoidDay()
-            val todaysCircle = com.core.voidapp.data.VoidRepository.circlePlansFor(today)
+            val todaysCircle = com.core.voidapp.data.VoidRepository.circlePlansForToday()
 
             if (todaysCircle.isEmpty()) {
                 VoidCard {
@@ -286,7 +303,7 @@ fun HomeScreen() {
             QuickAction("+ ADD TASK")
             QuickAction("+ STUDY SESSION")
             QuickAction("+ EXAM / TEST")
-            QuickAction("+ DAILY REPORT")
+            QuickAction("+ DAILY REPORT", onClick = onOpenDailyReport)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = APP_VERSION,
@@ -363,13 +380,14 @@ fun SystemStatusRow(name: String) {
 }
 
 @Composable
-fun QuickAction(text: String) {
+fun QuickAction(text: String, onClick: () -> Unit = {}) {
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(VoidColors.Surface2)
+            .clickable { onClick() }
             .padding(14.dp)
     ) {
         Text(text, color = VoidColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)

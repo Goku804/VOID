@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,31 +61,34 @@ import java.time.LocalTime
 @Composable
 fun TemporaryPlanContent() {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        temporaryPlanBrowseItems()
+    }
+}
 
-        item {
-            Text(
-                "Register new Temporary Plans in SETTINGS \u2192 PLANNING. This is where you track and act on what's already active.",
-                color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+/** Embeddable version of the Temporary Plan browsing list — used directly inside PLAN's single merged page, and by the standalone wrapper above. */
+@Composable
+fun LazyListScope.temporaryPlanBrowseItems() {
+    item {
+        Text(
+            "Register new Temporary Plans in SETTINGS \u2192 PLANNING. This is where you track and act on what's already active.",
+            color = VoidColors.TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+    }
 
-        item {
-            Text("ACTIVE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+    item {
+        Text("ACTIVE", color = VoidColors.TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
+    }
 
-        val active = VoidRepository.activeTemporaryTasks()
-        if (active.isEmpty()) {
-            item { Text("No temporary plans yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
-        }
+    val active = VoidRepository.activeTemporaryTasks()
+    if (active.isEmpty()) {
+        item { Text("No temporary plans yet.", color = VoidColors.TextSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+    }
 
-        items(active) { task ->
-            TemporaryTaskRow(task)
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        item { Spacer(modifier = Modifier.height(90.dp)) }
+    items(active) { task ->
+        TemporaryTaskRow(task)
+        Spacer(modifier = Modifier.height(10.dp))
     }
 }
 

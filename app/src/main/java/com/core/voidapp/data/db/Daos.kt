@@ -166,3 +166,36 @@ interface GuardianSettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: GuardianSettingsEntity)
 }
+
+@Dao
+interface DailyReportDao {
+    @Query("SELECT * FROM daily_reports")
+    suspend fun getAllReports(): List<DailyReportEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertReport(entity: DailyReportEntity)
+
+    @Query("SELECT * FROM daily_class_reports")
+    suspend fun getAllClassReports(): List<DailyClassReportEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertClassReport(entity: DailyClassReportEntity)
+
+    @Query("SELECT * FROM daily_study_reports")
+    suspend fun getAllStudyReports(): List<DailyStudyReportEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertStudyReport(entity: DailyStudyReportEntity)
+
+    @Query("SELECT * FROM daily_report_assignments")
+    suspend fun getAllAssignments(): List<DailyReportAssignmentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAssignment(entity: DailyReportAssignmentEntity)
+
+    @Query("SELECT * FROM daily_report_test_preps")
+    suspend fun getAllTestPreps(): List<DailyReportTestPrepEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTestPrep(entity: DailyReportTestPrepEntity)
+}

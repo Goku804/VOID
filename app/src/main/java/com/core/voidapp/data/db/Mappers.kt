@@ -226,3 +226,65 @@ fun GuardianSettingsEntity.toModel() = com.core.voidapp.data.guardian.GuardianSe
     enforcementMode = com.core.voidapp.data.guardian.EnforcementMode.valueOf(enforcementMode),
     allowedPackages = if (allowedPackages.isBlank()) emptySet() else allowedPackages.split(",").toSet()
 )
+
+fun com.core.voidapp.data.report.DailyReport.toEntity() = DailyReportEntity(
+    id = id, date = date.toEpochDay(), status = status.name,
+    createdAt = createdAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+    completedAt = completedAt?.atZone(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+)
+
+fun DailyReportEntity.toModel() = com.core.voidapp.data.report.DailyReport(
+    id = id, date = java.time.LocalDate.ofEpochDay(date),
+    status = com.core.voidapp.data.report.DailyReportStatus.valueOf(status),
+    createdAt = java.time.Instant.ofEpochMilli(createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime(),
+    completedAt = completedAt?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() }
+)
+
+fun com.core.voidapp.data.report.DailyClassReport.toEntity() = DailyClassReportEntity(
+    id = id, dailyReportId = dailyReportId, classPeriodId = classPeriodId,
+    attendance = attendance.name, understanding = understanding.name, difficulty = difficulty.name,
+    attention = attention.name, tookNotes = tookNotes.name, importantContent = importantContent, difficultyReason = difficultyReason
+)
+
+fun DailyClassReportEntity.toModel() = com.core.voidapp.data.report.DailyClassReport(
+    id = id, dailyReportId = dailyReportId, classPeriodId = classPeriodId,
+    attendance = com.core.voidapp.data.report.YesNoPartial.valueOf(attendance),
+    understanding = com.core.voidapp.data.report.YesNoPartial.valueOf(understanding),
+    difficulty = com.core.voidapp.data.report.DifficultyLevel.valueOf(difficulty),
+    attention = com.core.voidapp.data.report.AttentionLevel.valueOf(attention),
+    tookNotes = com.core.voidapp.data.report.YesNoPartial.valueOf(tookNotes),
+    importantContent = importantContent, difficultyReason = difficultyReason
+)
+
+fun com.core.voidapp.data.report.DailyStudyReport.toEntity() = DailyStudyReportEntity(
+    id = id, dailyReportId = dailyReportId, studySessionId = studySessionId, subjectId = subjectId, label = label,
+    completion = completion.name, difficulty = difficulty.name, understanding = understanding.name,
+    attention = attention.name, tookNotes = tookNotes.name, incompleteReason = incompleteReason?.name, incompleteNotes = incompleteNotes
+)
+
+fun DailyStudyReportEntity.toModel() = com.core.voidapp.data.report.DailyStudyReport(
+    id = id, dailyReportId = dailyReportId, studySessionId = studySessionId, subjectId = subjectId, label = label,
+    completion = com.core.voidapp.data.report.StudyCompletionResult.valueOf(completion),
+    difficulty = com.core.voidapp.data.report.DifficultyLevel.valueOf(difficulty),
+    understanding = com.core.voidapp.data.report.YesNoPartial.valueOf(understanding),
+    attention = com.core.voidapp.data.report.AttentionLevel.valueOf(attention),
+    tookNotes = com.core.voidapp.data.report.YesNoPartial.valueOf(tookNotes),
+    incompleteReason = incompleteReason?.let { com.core.voidapp.data.report.IncompleteReason.valueOf(it) },
+    incompleteNotes = incompleteNotes
+)
+
+fun com.core.voidapp.data.report.DailyReportAssignment.toEntity() = DailyReportAssignmentEntity(
+    id = id, dailyReportId = dailyReportId, temporaryTaskId = temporaryTaskId
+)
+
+fun DailyReportAssignmentEntity.toModel() = com.core.voidapp.data.report.DailyReportAssignment(
+    id = id, dailyReportId = dailyReportId, temporaryTaskId = temporaryTaskId
+)
+
+fun com.core.voidapp.data.report.DailyReportTestPrep.toEntity() = DailyReportTestPrepEntity(
+    id = id, dailyReportId = dailyReportId, subjectId = subjectId, examSubjectId = examSubjectId, rawNote = rawNote
+)
+
+fun DailyReportTestPrepEntity.toModel() = com.core.voidapp.data.report.DailyReportTestPrep(
+    id = id, dailyReportId = dailyReportId, subjectId = subjectId, examSubjectId = examSubjectId, rawNote = rawNote
+)
