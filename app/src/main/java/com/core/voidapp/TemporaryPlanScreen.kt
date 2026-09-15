@@ -65,8 +65,7 @@ fun TemporaryPlanContent() {
     }
 }
 
-/** Embeddable version of the Temporary Plan browsing list — used directly inside PLAN's single merged page, and by the standalone wrapper above. */
-@Composable
+/** Embeddable version of the Temporary Plan browsing list — used directly inside PLAN's single merged page, and by the standalone wrapper above. Deliberately NOT @Composable — see circlePlanBrowseItems for why. */
 fun LazyListScope.temporaryPlanBrowseItems() {
     item {
         Text(
@@ -210,7 +209,7 @@ fun TemporaryPlanRegistrationContent() {
 }
 
 @Composable
-private fun TemporaryTaskRow(task: TemporaryTask) {
+fun TemporaryTaskRow(task: TemporaryTask) {
     var expanded by remember { mutableStateOf(false) }
     val overdue = task.isOverdue()
     val priorityColor = when {

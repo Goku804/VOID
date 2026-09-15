@@ -55,16 +55,21 @@ import com.core.voidapp.data.resolvedUnit
 
 @Composable
 fun CirclePlansContent() {
+    val cycleLength = com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(androidx.compose.ui.platform.LocalContext.current)
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        circlePlanBrowseItems()
+        circlePlanBrowseItems(cycleLength)
     }
 }
 
-/** Embeddable version of the Circle Plan browsing list — used directly inside PLAN's single merged page, and by the standalone wrapper above. */
-@Composable
-fun LazyListScope.circlePlanBrowseItems() {
-    val cycleLength = com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(androidx.compose.ui.platform.LocalContext.current)
-
+/**
+ * Embeddable version of the Circle Plan browsing list — used directly
+ * inside PLAN's single merged page, and by the standalone wrapper above.
+ * Deliberately NOT @Composable: LazyColumn's own content lambda is a
+ * plain `LazyListScope.() -> Unit`, not a composable context, so only
+ * item()/items() may be called here directly — cycleLength has to be
+ * read by the (actually composable) caller and passed in.
+ */
+fun LazyListScope.circlePlanBrowseItems(cycleLength: Int) {
     item {
         Text(
             "Register new Circle Plan slots in SETTINGS \u2192 PLANNING. This is where you browse and step through what's already registered.",

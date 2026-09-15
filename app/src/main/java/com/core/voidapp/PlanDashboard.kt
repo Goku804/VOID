@@ -29,6 +29,8 @@ import com.core.voidapp.data.isOverdue
  */
 @Composable
 fun PlanningScreen() {
+    val cycleLength = com.core.voidapp.data.CircleCyclePreferences.cycleLengthWeeks(androidx.compose.ui.platform.LocalContext.current)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -76,7 +78,7 @@ fun PlanningScreen() {
             VoidSectionLabel("CIRCLE PLAN \u2014 EVERY WEEK")
             Spacer(modifier = Modifier.height(8.dp))
         }
-        circlePlanBrowseItems()
+        circlePlanBrowseItems(cycleLength)
         item { Spacer(modifier = Modifier.height(16.dp)) }
 
         item {
